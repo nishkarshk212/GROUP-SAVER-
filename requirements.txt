@@ -1,0 +1,11 @@
+python-telegram-bot>=20,<23
+nudenet
+Pillow
+profanity-check
+google-cloud-translate
+pyrogram
+tgcrypto
+better-profanity
+detoxify
+torch
+transformers==4.37.2
