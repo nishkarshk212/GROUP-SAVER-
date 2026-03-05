@@ -707,12 +707,13 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
 
 
 async def user_profile_is_nsfw(user_id: int, context: ContextTypes.DEFAULT_TYPE, threshold: float = 0.7) -> bool:
-    try:
-        enabled = os.environ.get("PFP_NSFWD_ENABLED", os.environ.get("ENABLE_PFP_NSFWD", "1")).strip()
-        if enabled in ("0", "false", "False", "no", "No"):
-            return False
-    except Exception:
-        pass
+    """Check if user's profile photo is NSFW. Respects PFP_NSFWD_ENABLED setting."""
+    # Check if profile photo scanning is disabled
+    enabled = os.environ.get("PFP_NSFWD_ENABLED", os.environ.get("ENABLE_PFP_NSFWD", "1")).strip()
+    if enabled in ("0", "false", "False", "no", "No", "off", "Off"):
+        print(f"Profile photo scanning DISABLED (PFP_NSFWD_ENABLED={enabled})")
+        return False  # Skip profile photo check if disabled
+    
     if user_id in _pfp_scan_cache:
         return _pfp_scan_cache[user_id]
     try:
