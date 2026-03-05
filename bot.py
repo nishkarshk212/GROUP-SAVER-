@@ -100,17 +100,13 @@ def normalize_obfuscated_text(text: str) -> str:
     
     text = text.lower()
     
-    # Remove zero-width characters and invisible Unicode
+    # Remove zero-width characters and invisible Unicode first
     text = re.sub(r"\u200b", "", text)  # Zero-width space
     text = re.sub(r"\u200c", "", text)  # Zero-width non-joiner
     text = re.sub(r"\u200d", "", text)  # Zero-width joiner
     text = re.sub(r"\ufeff", "", text)  # BOM
     
-    # Remove ALL types of whitespace and separators to catch spaced text
-    # This handles: S e x, p o r n, d m f o r, etc.
-    text = re.sub(r"[\s\u00A0\u2000-\u200B\u202F\u205F\u3000]+", "", text)
-    
-    # Character replacement map for obfuscation
+    # Character replacement map for obfuscation (DO THIS FIRST before removing spaces)
     replace_map = {
         "0": "o",
         "1": "i",
@@ -144,6 +140,11 @@ def normalize_obfuscated_text(text: str) -> str:
     
     for k, v in replace_map.items():
         text = text.replace(k, v)
+    
+    # Remove ALL types of whitespace and separators LAST
+    # This handles: S e x, p o r n, d m f o r, etc.
+    # Must be done AFTER character replacement to properly handle "S e x" -> "sex"
+    text = re.sub(r"[\s\u00A0\u2000-\u200B\u202F\u205F\u3000]+", "", text)
     
     return text
 
