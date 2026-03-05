@@ -383,6 +383,9 @@ alerted_users_per_chat: Dict[int, Set[int]] = {}
 _pfp_scan_cache: Dict[int, bool] = {}
 # Track chats where bot is active
 active_chats: Set[int] = set()
+# Track users who were recently warned to prevent duplicate warnings
+_warned_users: Dict[int, float] = {}  # user_id -> timestamp
+_WARN_COOLDOWN = 30  # seconds between warnings for same user
 # Log channel for bot join/leave notifications - should be set via environment variable
 # To use: set LOG_CHANNEL_ID environment variable to either:
 # 1. Channel username like "@your_channel_username" 
@@ -681,6 +684,20 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
     user_id = user.id
     chat_id = chat.id
     
+    # Check if this user was recently warned (prevent spam)
+    import time
+    current_time = time.time()
+    if user_id in _warned_users:
+        time_since_last_warn = current_time - _warned_users[user_id]
+        if time_since_last_warn < _WARN_COOLDOWN:
+            print(f"⏭️ Skipping warning for user {user_id} (warned {time_since_last_warn:.1f}s ago)")
+            # Still delete the message, just don't send new warning
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            return
+    
     # Delete the NSFW message
     try:
         await msg.delete()
@@ -699,6 +716,14 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
         print(f"⚠️ Sent warning message {warning_msg.message_id} in chat {chat_id}")
         # Schedule auto-delete after 10 seconds
         asyncio.create_task(_auto_delete(warning_msg, 10))
+        
+        # Mark this user as warned
+        _warned_users[user_id] = current_time
+        
+        # Clean up old entries (older than 5 minutes)
+        cutoff_time = current_time - 300
+        _warned_users = {uid: ts for uid, ts in _warned_users.items() if ts > cutoff_time}
+        
     except Exception as e:
         print(f"⚠️ Failed to send/delete warning message: {e}")
         pass
