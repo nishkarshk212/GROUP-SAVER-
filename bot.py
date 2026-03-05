@@ -642,13 +642,15 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
     except Exception:
         pass
     
-    # Send simple warning message to the chat
+    # Send simple warning message to the chat (auto-delete after 10 seconds)
     try:
-        await context.bot.send_message(
+        warning_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=f"⚠️ User ID: {user_id} NSFW content detected!",
             parse_mode="HTML"
         )
+        # Schedule auto-delete after 10 seconds
+        asyncio.create_task(_auto_delete(warning_msg, 10))
     except Exception:
         pass
     
