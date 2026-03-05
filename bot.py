@@ -90,6 +90,82 @@ def normalize_unicode_text(text: str) -> str:
     return ''.join(result)
 
 
+def normalize_obfuscated_text(text: str) -> str:
+    """
+    Normalize obfuscated text by replacing common character substitutions.
+    Handles patterns like: s3x, pr0n, p*rn, d m f o r, etc.
+    """
+    if not text:
+        return text
+    
+    text = text.lower()
+    
+    # Remove zero-width characters and invisible Unicode
+    text = re.sub(r"\u200b", "", text)  # Zero-width space
+    text = re.sub(r"\u200c", "", text)  # Zero-width non-joiner
+    text = re.sub(r"\u200d", "", text)  # Zero-width joiner
+    text = re.sub(r"\ufeff", "", text)  # BOM
+    
+    # Character replacement map for obfuscation
+    replace_map = {
+        "0": "o",
+        "1": "i",
+        "3": "e",
+        "4": "a",
+        "5": "s",
+        "7": "t",
+        "@": "a",
+        "*": "",
+        "!": "i",
+        "$": "s",
+        "+": "t",
+        "#": "h",
+        "(": "o",
+        ")": "o",
+        "<": "c",
+        ">": "c",
+        "[]": "o",
+        "|": "",
+        "_": "",
+        "-": "",
+        ".": "",
+        " ": "",  # Remove spaces to catch "s e x"
+        "\t": "",  # Remove tabs
+        "\n": "",  # Remove newlines
+    }
+    
+    for k, v in replace_map.items():
+        text = text.replace(k, v)
+    
+    return text
+
+
+def detect_with_regex_patterns(text: str) -> bool:
+    """
+    Detect NSFW content using regex patterns for obfuscated terms.
+    """
+    NSFW_REGEX_PATTERNS = [
+        r"s[e3@]+x+",           # sex, s3x, s@x, seex
+        r"p[o0@]+r+n",          # porn, p0rn, p*rn, pr0n
+        r"p+r+[o0@]+n+",        # pron, pr0n
+        r"x{2,}",               # xxx, xxxx
+        r"n[u*]+d+e?",          # nude, n*de, nuude
+        r"d+\s*m+\s*f+\s*o+\s*r+",  # dm for, d m f o r
+        r"18\+?",               # 18+, 18
+        r"o+n+l+y+f+a*n+s+",    # onlyfans variations
+        r"f+u+c+k+",            # fuck variations
+        r"s+h+i+t+",            # shit variations
+        r"a+s+s+",              # ass variations
+        r"d+i+c+k+",            # dick variations
+    ]
+    
+    for pattern in NSFW_REGEX_PATTERNS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    
+    return False
+
+
 def _load_bad_words() -> None:
     global _bad_word_re, _bad_phrases, _bad_loaded, _bad_langs
     if _bad_loaded:
@@ -411,6 +487,9 @@ def text_has_nsfw(text: str) -> bool:
     # Normalize text from any font/style to standard ASCII
     normalized_text = normalize_unicode_text(text)
     
+    # Normalize obfuscated text (s3x, pr0n, etc.)
+    obfuscation_normalized = normalize_obfuscated_text(text)
+    
     # Check original text
     t = text.lower()
     if _bad_word_re and _bad_word_re.search(t):
@@ -427,10 +506,27 @@ def text_has_nsfw(text: str) -> bool:
         if p in t_normalized:
             return True
     
+    # Check obfuscation-normalized text (handles s3x, p*rn, etc.)
+    if _bad_word_re and _bad_word_re.search(obfuscation_normalized):
+        return True
+    for p in _bad_phrases:
+        if p in obfuscation_normalized:
+            return True
+    
+    # Check for obfuscated NSFW terms using regex patterns
+    if detect_with_regex_patterns(text):
+        return True
+    if detect_with_regex_patterns(normalized_text):
+        return True
+    if detect_with_regex_patterns(obfuscation_normalized):
+        return True
+    
     # Check for obfuscated NSFW terms (p0rn, pr0n, etc.)
     if nsfw_obfuscation_re.search(text):
         return True
     if nsfw_obfuscation_re.search(normalized_text):
+        return True
+    if nsfw_obfuscation_re.search(obfuscation_normalized):
         return True
     
     # Also check translated text for non-English content
@@ -453,10 +549,22 @@ def text_has_nsfw(text: str) -> bool:
         for p in _bad_phrases:
             if p in translated_normalized:
                 return True
+        
+        # Check obfuscation in translated text
+        translated_obfuscated = normalize_obfuscated_text(translated_text)
+        if _bad_word_re and _bad_word_re.search(translated_obfuscated):
+            return True
+        for p in _bad_phrases:
+            if p in translated_obfuscated:
+                return True
+        if detect_with_regex_patterns(translated_obfuscated):
+            return True
     
     if _ml_profanity(text):
         return True
     if _ml_profanity(normalized_text):
+        return True
+    if _ml_profanity(obfuscation_normalized):
         return True
     
     # Check for child exploitation and sexual violence content
@@ -465,6 +573,8 @@ def text_has_nsfw(text: str) -> bool:
     if child_exploitation_re.search(normalized_text):
         return True
     if child_exploitation_re.search(translated_text):
+        return True
+    if child_exploitation_re.search(obfuscation_normalized):
         return True
     return False
 
