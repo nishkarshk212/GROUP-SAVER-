@@ -765,38 +765,61 @@ async def user_profile_is_nsfw(user_id: int, context: ContextTypes.DEFAULT_TYPE,
     
     if user_id in _pfp_scan_cache:
         return _pfp_scan_cache[user_id]
+    
     try:
+        # Get user's profile photos
         photos = await context.bot.get_user_profile_photos(user_id=user_id, limit=1)
         if not photos or not photos.total_count:
+            print(f"ℹ️ No profile photos found for user {user_id}")
             _pfp_scan_cache[user_id] = False
             return False
+        
         first = photos.photos[0] if photos.photos else []
         if not first:
+            print(f"⚠️ Empty photo array for user {user_id}")
             _pfp_scan_cache[user_id] = False
             return False
+        
+        # Get the highest resolution photo
         file_id = first[-1].file_id
+        print(f"📸 Found profile photo for user {user_id}, file_id: {file_id}")
+        
+        # Download the file
         tg_file = await context.bot.get_file(file_id)
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            tmp_path = tmp.name
+        
+        # Create temporary file with proper download
+        tmp_path = None
         try:
-            await tg_file.download_to_drive(custom_path=tmp_path)
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            # Download to the temporary path
+            await tg_file.download_to_custom_path(tmp_path)
+            print(f"✅ Downloaded profile photo to {tmp_path}")
+            
             nsfw_detected = False
+            
+            # Try NudeClassifier first
             try:
                 thr_cls = float(os.environ.get("NSFW_PFP_CLS_THRESHOLD", "0.85"))
             except Exception:
                 thr_cls = 0.85
+            
             try:
                 thr_det = float(os.environ.get("NSFW_PFP_THRESHOLD", str(threshold)))
             except Exception:
                 thr_det = threshold
+            
             if NudeClassifier is not None:
                 global _nude_classifier
                 if _nude_classifier is None:
                     _nude_classifier = NudeClassifier()
+                
                 try:
                     cls_res = _nude_classifier.classify(tmp_path)
                     pred = None
                     conf = 0.0
+                    
                     if isinstance(cls_res, dict):
                         v = cls_res.get(tmp_path)
                         if v is None and cls_res:
@@ -816,28 +839,56 @@ async def user_profile_is_nsfw(user_id: int, context: ContextTypes.DEFAULT_TYPE,
                         if isinstance(v, dict):
                             conf = float(v.get("confidence", 0.0))
                             pred = str(v.get("prediction", "")).lower()
+                    
+                    print(f"🔍 Classifier result: prediction={pred}, confidence={conf:.2f}, threshold={thr_cls:.2f}")
+                    
                     if pred in ("unsafe", "nsfw") and conf >= thr_cls:
                         nsfw_detected = True
+                        print(f"⚠️ NSFW detected by classifier!")
+                except Exception as e:
+                    print(f"⚠️ Classifier error: {e}")
+                    pass
+            
+            # If classifier didn't detect, try NudeDetector
+            if not nsfw_detected:
+                try:
+                    det_res = _nude_detector.detect(tmp_path) or []
+                    print(f"🔍 Detector found {len(det_res)} detections")
+                    
+                    for d in det_res:
+                        try:
+                            sc = float(d.get("score", 0.0))
+                            label = d.get("label", "unknown")
+                        except Exception:
+                            sc = 0.0
+                            label = "unknown"
+                        
+                        print(f"  - {label}: score={sc:.2f}, threshold={thr_det:.2f}")
+                        
+                        if sc >= thr_det:
+                            nsfw_detected = True
+                            print(f"⚠️ NSFW detected by detector ({label})!")
+                            break
+                except Exception as e:
+                    print(f"⚠️ Detector error: {e}")
+                    pass
+            
+            print(f"📊 Final result for user {user_id}: NSFW={nsfw_detected}")
+            
+        finally:
+            # Clean up temporary file
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                    print(f"🗑️ Cleaned up temp file: {tmp_path}")
                 except Exception:
                     pass
-            if not nsfw_detected:
-                det_res = _nude_detector.detect(tmp_path) or []
-                for d in det_res:
-                    try:
-                        sc = float(d.get("score", 0.0))
-                    except Exception:
-                        sc = 0.0
-                    if sc >= thr_det:
-                        nsfw_detected = True
-                        break
-        finally:
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
+        
         _pfp_scan_cache[user_id] = nsfw_detected
         return nsfw_detected
-    except Exception:
+        
+    except Exception as e:
+        print(f"❌ Error checking profile photo for user {user_id}: {e}")
         _pfp_scan_cache[user_id] = False
         return False
 
