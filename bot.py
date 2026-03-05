@@ -3,6 +3,7 @@ import re
 import asyncio
 import tempfile
 import json
+import unicodedata
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from typing import Dict, Set
@@ -46,6 +47,48 @@ _bad_supported_langs = [
 ]
 _profanity_model_loaded = False
 _toxic_pipeline = None
+
+def normalize_unicode_text(text: str) -> str:
+    """
+    Normalize text from any font/style (bold, italic, script, etc.) to standard ASCII.
+    Handles mathematical alphanumeric symbols and other Unicode font variations.
+    """
+    if not text:
+        return text
+    
+    # First, apply Unicode normalization (NFKC form)
+    # This converts many styled characters to their base forms
+    normalized = unicodedata.normalize('NFKC', text)
+    
+    # Then apply our custom mapping for remaining special characters
+    result = []
+    for char in normalized:
+        # Check if character is in our font map
+        if char in UNICODE_FONT_MAP:
+            result.append(UNICODE_FONT_MAP[char])
+        else:
+            # Try to decompose and get base character
+            try:
+                decomposed = unicodedata.name(char, '')
+                # Extract base letter from Unicode name if possible
+                if any(style in decomposed for style in ['MATHEMATICAL', 'FULLWIDTH']):
+                    # Try to find the base character
+                    for style_name in ['BOLD', 'ITALIC', 'SCRIPT', 'FRAKTUR', 'DOUBLE-STRUCK', 'MONOSPACE']:
+                        if style_name in decomposed:
+                            # Get the base character name
+                            base_match = re.search(r'([A-Z])\b', decomposed)
+                            if base_match:
+                                result.append(base_match.group(1).lower() if 'SMALL' in decomposed or 'LOWER' in decomposed else base_match.group(1))
+                                break
+                    else:
+                        result.append(char)
+                else:
+                    result.append(char)
+            except Exception:
+                result.append(char)
+    
+    return ''.join(result)
+
 
 def _load_bad_words() -> None:
     global _bad_word_re, _bad_phrases, _bad_loaded, _bad_langs
@@ -155,6 +198,83 @@ child_exploitation_re = re.compile('|'.join(child_exploitation_patterns), re.IGN
 
 # Global variable for translation client
 translate_client = None
+
+# Unicode normalization mapping for special fonts/styles
+UNICODE_FONT_MAP = {
+    # Mathematical Alphanumeric Symbols (bold, italic, script, etc.)
+    '𝐚': 'a', '𝐛': 'b', '𝐜': 'c', '𝐝': 'd', '𝐞': 'e', '𝐟': 'f', '𝐠': 'g', '𝐡': 'h', '𝐢': 'i',
+    '𝐣': 'j', '𝐤': 'k', '𝐥': 'l', '𝐦': 'm', '𝐧': 'n', '𝐨': 'o', '𝐩': 'p', '𝐪': 'q', '𝐫': 'r',
+    '𝐬': 's', '𝐭': 't', '𝐮': 'u', '𝐯': 'v', '𝐰': 'w', '𝐱': 'x', '𝐲': 'y', '𝐳': 'z',
+    '𝐀': 'A', '𝐁': 'B', '𝐂': 'C', '𝐃': 'D', '𝐄': 'E', '𝐅': 'F', '𝐆': 'G', '𝐇': 'H', '𝐈': 'I',
+    '𝐉': 'J', '𝐊': 'K', '𝐋': 'L', '𝐌': 'M', '𝐍': 'N', '𝐎': 'O', '𝐏': 'P', '𝐐': 'Q', '𝐑': 'R',
+    '𝐒': 'S', '𝐓': 'T', '𝐔': 'U', '𝐕': 'V', '𝐖': 'W', '𝐗': 'X', '𝐘': 'Y', '𝐙': 'Z',
+    # Italic
+    '𝑎': 'a', '𝑏': 'b', '𝑐': 'c', '𝑑': 'd', '𝑒': 'e', '𝑓': 'f', '𝑔': 'g', 'ℎ': 'h', '𝑖': 'i',
+    '𝑗': 'j', '𝑘': 'k', '𝑙': 'l', '𝑚': 'm', '𝑛': 'n', '𝑜': 'o', '𝑝': 'p', '𝑞': 'q', '𝑟': 'r',
+    '𝑠': 's', '𝑡': 't', '𝑢': 'u', '𝑣': 'v', '𝑤': 'w', '𝑥': 'x', '𝑦': 'y', '𝑧': 'z',
+    '𝐴': 'A', '𝐵': 'B', '𝐶': 'C', '𝐷': 'D', '𝐸': 'E', '𝐹': 'F', '𝐺': 'G', '𝐻': 'H', '𝐼': 'I',
+    '𝐽': 'J', '𝐾': 'K', '𝐿': 'L', '𝑀': 'M', '𝑁': 'N', '𝑂': 'O', '𝑃': 'P', '𝑄': 'Q', '𝑅': 'R',
+    '𝑆': 'S', '𝑇': 'T', '𝑈': 'U', '𝑉': 'V', '𝑊': 'W', '𝑋': 'X', '𝑌': 'Y', '𝑍': 'Z',
+    # Bold Italic
+    '𝒂': 'a', '𝒃': 'b', '𝒄': 'c', '𝒅': 'd', '𝒆': 'e', '𝒇': 'f', '𝒈': 'g', '𝒉': 'h', '𝒊': 'i',
+    '𝒋': 'j', '𝒌': 'k', '𝒍': 'l', '𝒎': 'm', '𝒏': 'n', '𝒐': 'o', '𝒑': 'p', '𝒒': 'q', '𝒓': 'r',
+    '𝒔': 's', '𝒕': 't', '𝒖': 'u', '𝒗': 'v', '𝒘': 'w', '𝒙': 'x', '𝒚': 'y', '𝒛': 'z',
+    '𝑨': 'A', '𝑩': 'B', '𝑪': 'C', '𝑫': 'D', '𝑬': 'E', '𝑭': 'F', '𝑮': 'G', '𝑯': 'H', '𝑰': 'I',
+    '𝑱': 'J', '𝑲': 'K', '𝑳': 'L', '𝑴': 'M', '𝑵': 'N', '𝑶': 'O', '𝑷': 'P', '𝑸': 'Q', '𝑹': 'R',
+    '𝑺': 'S', '𝑻': 'T', '𝑼': 'U', '𝑽': 'V', '𝑾': 'W', '𝑿': 'X', '𝒀': 'Y', '𝒁': 'Z',
+    # Script
+    '𝒶': 'a', '𝒷': 'b', '𝒸': 'c', '𝒹': 'd', '𝓁': 'l', '𝓂': 'm', '𝓃': 'n', '𝓅': 'p', '𝓆': 'q',
+    '𝓇': 'r', '𝓈': 's', '𝓉': 't', '𝓊': 'u', '𝓋': 'v', '𝓌': 'w', '𝓍': 'x', '𝓎': 'y', '𝓏': 'z',
+    '𝒜': 'A', '𝒞': 'C', '𝒟': 'D', '𝒢': 'G', '𝒥': 'J', '𝒦': 'K', '𝒩': 'N', '𝒪': 'O', '𝒫': 'P',
+    '𝒬': 'Q', '𝒮': 'S', '𝒯': 'T', '𝒰': 'U', '𝒱': 'V', '𝒲': 'W', '𝒳': 'X', '𝒴': 'Y', '𝒵': 'Z',
+    # Bold Script
+    '𝓪': 'a', '𝓫': 'b', '𝓬': 'c', '𝓭': 'd', '𝓮': 'e', '𝓯': 'f', '𝓰': 'g', '𝓱': 'h', '𝓲': 'i',
+    '𝓳': 'j', '𝓴': 'k', '𝓵': 'l', '𝓶': 'm', '𝓷': 'n', '𝓸': 'o', '𝓹': 'p', '𝓺': 'q', '𝓻': 'r',
+    '𝓼': 's', '𝓽': 't', '𝓾': 'u', '𝓿': 'v', '𝔀': 'w', '𝔁': 'x', '𝔂': 'y', '𝔃': 'z',
+    '𝓐': 'A', '𝓑': 'B', '𝓒': 'C', '𝓓': 'D', '𝓔': 'E', '𝓕': 'F', '𝓖': 'G', '𝓗': 'H', '𝓘': 'I',
+    '𝓙': 'J', '𝓚': 'K', '𝓛': 'L', '𝓜': 'M', '𝓝': 'N', '𝓞': 'O', '𝓟': 'P', '𝓠': 'Q', '𝓡': 'R',
+    '𝓢': 'S', '𝓣': 'T', '𝓤': 'U', '𝓥': 'V', '𝓦': 'W', '𝓧': 'X', '𝓨': 'Y', '𝓩': 'Z',
+    # Fraktur
+    '𝔞': 'a', '𝔟': 'b', '𝔠': 'c', '𝔡': 'd', '𝔢': 'e', '𝔣': 'f', '𝔤': 'g', '𝔥': 'h', '𝔦': 'i',
+    '𝔧': 'j', '𝔨': 'k', '𝔩': 'l', '𝔪': 'm', '𝔫': 'n', '𝔬': 'o', '𝔭': 'p', '𝔮': 'q', '𝔯': 'r',
+    '𝔰': 's', '𝔱': 't', '𝔲': 'u', '𝔳': 'v', '𝔴': 'w', '𝔵': 'x', '𝔶': 'y', '𝔷': 'z',
+    '𝔄': 'A', '𝔅': 'B', 'ℭ': 'C', '𝔇': 'D', '𝔈': 'E', '𝔉': 'F', '𝔊': 'G', 'ℌ': 'H', 'ℑ': 'I',
+    '𝔍': 'J', '𝔎': 'K', '𝔏': 'L', '𝔐': 'M', '𝔑': 'N', '𝔒': 'O', '𝔓': 'P', '𝔔': 'Q', 'ℜ': 'R',
+    '𝔖': 'S', '𝔗': 'T', '𝔘': 'U', '𝔙': 'V', '𝔚': 'W', '𝔛': 'X', '𝔜': 'Y', '𝔝': 'Z',
+    # Double-struck
+    '𝕒': 'a', '𝕓': 'b', '𝕔': 'c', '𝕕': 'd', '𝕖': 'e', '𝕗': 'f', '𝕘': 'g', '𝕙': 'h', '𝕚': 'i',
+    '𝕛': 'j', '𝕜': 'k', '𝕝': 'l', '𝕞': 'm', '𝕟': 'n', '𝕠': 'o', '𝕡': 'p', '𝕢': 'q', '𝕣': 'r',
+    '𝕤': 's', '𝕥': 't', '𝕦': 'u', '𝕧': 'v', '𝕨': 'w', '𝕩': 'x', '𝕪': 'y', '𝕫': 'z',
+    '𝔸': 'A', '𝔹': 'B', 'ℂ': 'C', '𝔻': 'D', '𝔼': 'E', '𝔽': 'F', '𝔾': 'G', 'ℍ': 'H', '𝕀': 'I',
+    '𝕁': 'J', '𝕂': 'K', '𝕃': 'L', '𝕄': 'M', 'ℕ': 'N', '𝕆': 'O', 'ℙ': 'P', 'ℚ': 'Q', 'ℝ': 'R',
+    '𝕊': 'S', '𝕋': 'T', '𝕌': 'U', '𝕍': 'V', '𝕎': 'W', '𝕏': 'X', '𝕐': 'Y', 'ℤ': 'Z',
+    # Monospace
+    '𝚊': 'a', '𝚋': 'b', '𝚌': 'c', '𝚍': 'd', '𝚎': 'e', '𝚏': 'f', '𝚐': 'g', '𝚑': 'h', '𝚒': 'i',
+    '𝚓': 'j', '𝚔': 'k', '𝚕': 'l', '𝚖': 'm', '𝚗': 'n', '𝚘': 'o', '𝚙': 'p', '𝚚': 'q', '𝚛': 'r',
+    '𝚜': 's', '𝚝': 't', '𝚞': 'u', '𝚟': 'v', '𝚠': 'w', '𝚡': 'x', '𝚢': 'y', '𝚣': 'z',
+    '𝙰': 'A', '𝙱': 'B', '𝙲': 'C', '𝙳': 'D', '𝙴': 'E', '𝙵': 'F', '𝙶': 'G', '𝙷': 'H', '𝙸': 'I',
+    '𝙹': 'J', '𝙺': 'K', '𝙻': 'L', '𝙼': 'M', '𝙽': 'N', '𝙾': 'O', '𝙿': 'P', '𝚀': 'Q', '𝚁': 'R',
+    '𝚂': 'S', '𝚃': 'T', '𝚄': 'U', '𝚅': 'V', '𝚆': 'W', '𝚇': 'X', '𝚈': 'Y', '𝚉': 'Z',
+    # Circled
+    'ⓐ': 'a', 'ⓑ': 'b', 'ⓒ': 'c', 'ⓓ': 'd', 'ⓔ': 'e', 'ⓕ': 'f', 'ⓖ': 'g', 'ⓗ': 'h', 'ⓘ': 'i',
+    'ⓙ': 'j', 'ⓚ': 'k', 'ⓛ': 'l', 'ⓜ': 'm', 'ⓝ': 'n', 'ⓞ': 'o', 'ⓟ': 'p', 'ⓠ': 'q', 'ⓡ': 'r',
+    'ⓢ': 's', 'ⓣ': 't', 'ⓤ': 'u', 'ⓥ': 'v', 'ⓦ': 'w', 'ⓧ': 'x', 'ⓨ': 'y', 'ⓩ': 'z',
+    'Ⓐ': 'A', 'Ⓑ': 'B', 'Ⓒ': 'C', 'Ⓓ': 'D', 'Ⓔ': 'E', 'Ⓕ': 'F', 'Ⓖ': 'G', 'Ⓗ': 'H', 'Ⓘ': 'I',
+    'Ⓙ': 'J', 'Ⓚ': 'K', 'Ⓛ': 'L', 'Ⓜ': 'M', 'Ⓝ': 'N', 'Ⓞ': 'O', 'Ⓟ': 'P', 'Ⓠ': 'Q', 'Ⓡ': 'R',
+    'Ⓢ': 'S', 'Ⓣ': 'T', 'Ⓤ': 'U', 'Ⓥ': 'V', 'Ⓦ': 'W', 'Ⓧ': 'X', 'Ⓨ': 'Y', 'Ⓩ': 'Z',
+    # Fullwidth
+    'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e', 'f': 'f', 'g': 'g', 'h': 'h', 'i': 'i',
+    'j': 'j', 'k': 'k', 'l': 'l', 'm': 'm', 'n': 'n', 'o': 'o', 'p': 'p', 'q': 'q', 'r': 'r',
+    's': 's', 't': 't', 'u': 'u', 'v': 'v', 'w': 'w', 'x': 'x', 'y': 'y', 'z': 'z',
+    'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'E': 'E', 'F': 'F', 'G': 'G', 'H': 'H', 'I': 'I',
+    'J': 'J', 'K': 'K', 'L': 'L', 'M': 'M', 'N': 'N', 'O': 'O', 'P': 'P', 'Q': 'Q', 'R': 'R',
+    'S': 'S', 'T': 'T', 'U': 'U', 'V': 'V', 'W': 'W', 'X': 'X', 'Y': 'Y', 'Z': 'Z',
+    # Numbers
+    '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
+    '𝟎': '0', '𝟏': '1', '𝟐': '2', '𝟑': '3', '𝟒': '4', '𝟓': '5', '𝟔': '6', '𝟕': '7', '𝟖': '8', '𝟗': '9',
+    '𝟢': '0', '𝟣': '1', '𝟤': '2', '𝟥': '3', '𝟦': '4', '𝟧': '5', '𝟨': '6', '𝟩': '7', '𝟪': '8', '𝟫': '9',
+    '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
+}
 
 alerted_users_per_chat: Dict[int, Set[int]] = {}
 _pfp_scan_cache: Dict[int, bool] = {}
@@ -288,6 +408,9 @@ def text_has_nsfw(text: str) -> bool:
     if not _bad_loaded:
         _load_bad_words()
     
+    # Normalize text from any font/style to standard ASCII
+    normalized_text = normalize_unicode_text(text)
+    
     # Check original text
     t = text.lower()
     if _bad_word_re and _bad_word_re.search(t):
@@ -296,8 +419,18 @@ def text_has_nsfw(text: str) -> bool:
         if p in t:
             return True
     
+    # Check normalized text (handles fancy fonts/styles)
+    t_normalized = normalized_text.lower()
+    if _bad_word_re and _bad_word_re.search(t_normalized):
+        return True
+    for p in _bad_phrases:
+        if p in t_normalized:
+            return True
+    
     # Check for obfuscated NSFW terms (p0rn, pr0n, etc.)
     if nsfw_obfuscation_re.search(text):
+        return True
+    if nsfw_obfuscation_re.search(normalized_text):
         return True
     
     # Also check translated text for non-English content
@@ -312,11 +445,24 @@ def text_has_nsfw(text: str) -> bool:
         # Check obfuscation patterns in translated text too
         if nsfw_obfuscation_re.search(translated_text):
             return True
+        
+        # Also check normalized translated text
+        translated_normalized = normalize_unicode_text(translated_text).lower()
+        if _bad_word_re and _bad_word_re.search(translated_normalized):
+            return True
+        for p in _bad_phrases:
+            if p in translated_normalized:
+                return True
     
     if _ml_profanity(text):
         return True
+    if _ml_profanity(normalized_text):
+        return True
+    
     # Check for child exploitation and sexual violence content
     if child_exploitation_re.search(text):
+        return True
+    if child_exploitation_re.search(normalized_text):
         return True
     if child_exploitation_re.search(translated_text):
         return True
@@ -361,38 +507,43 @@ async def send_temp(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str,
 
 
 async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str) -> None:
+    """Only detect NSFW content, delete the message, and send warning. No limits, no actions."""
     msg = update.effective_message
     if not msg:
         return
-    user_id = None
-    try:
-        if msg.from_user:
-            user_id = msg.from_user.id
-    except Exception:
-        user_id = None
+    
+    user = msg.from_user
+    chat = msg.chat
+    
+    if not user or not chat:
+        # Just delete the message if we can't identify user/chat
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        return
+    
+    user_id = user.id
+    chat_id = chat.id
+    
+    # Delete the NSFW message
     try:
         await msg.delete()
     except Exception:
         pass
+    
+    # Send simple warning message to the chat
     try:
-        chat_id = msg.chat.id
-        if user_id is not None:
-            await send_temp(context, chat_id, f"Moderation: user_id={user_id} content removed ({reason}).", 10)
-        else:
-            await send_temp(context, chat_id, f"Moderation: content removed ({reason}).", 10)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"⚠️ User ID: {user_id} NSFW content detected!",
+            parse_mode="HTML"
+        )
     except Exception:
         pass
+    
+    # Send detailed info to chat owner/admin (optional logging)
     try:
-        chat = msg.chat
-        chat_id = chat.id
-        offender = msg.from_user
-        if offender:
-            s = alerted_users_per_chat.get(chat_id)
-            if s is None:
-                s = set()
-                alerted_users_per_chat[chat_id] = s
-            if offender.id in s:
-                return
         admins = await context.bot.get_chat_administrators(chat_id)
         owner_user = None
         for a in admins or []:
@@ -407,15 +558,17 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
                 owner_user = admins[0].user
             except Exception:
                 owner_user = None
+        
         if owner_user:
             parts = []
+            parts.append(f"🚨 NSFW Alert")
             parts.append(f"Group: {getattr(chat, 'title', '') or 'N/A'} (id={chat_id})")
-            if offender:
-                uname = f"@{offender.username}" if offender.username else "N/A"
-                fullname = " ".join([p for p in [offender.first_name, offender.last_name] if p]) or "N/A"
-                parts.append(f"Offender: id={offender.id}, username={uname}, name={fullname}")
+            uname = f"@{user.username}" if user.username else "N/A"
+            fullname = " ".join([p for p in [user.first_name, user.last_name] if p]) or "N/A"
+            parts.append(f"User: id={user_id}, username={uname}, name={fullname}")
             parts.append(f"Action: Message deleted")
             parts.append(f"Reason: {reason}")
+            
             snippet = None
             try:
                 texts = []
@@ -426,15 +579,15 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
                 snippet = " ".join(texts).strip()
             except Exception:
                 snippet = None
+            
             if snippet:
                 if len(snippet) > 300:
                     snippet = snippet[:297] + "..."
                 parts.append(f"Snippet: {snippet}")
+            
             text = "\n".join(parts)
             try:
                 await context.bot.send_message(chat_id=owner_user.id, text=text)
-                if offender:
-                    alerted_users_per_chat[chat_id].add(offender.id)
             except Exception:
                 pass
     except Exception:
