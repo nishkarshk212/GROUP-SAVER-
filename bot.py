@@ -112,6 +112,11 @@ drug_re = re.compile(
     r"(?i)\b(?:drug|weed|marijuana|cannabis|cocaine|crack|heroin|mdma|molly|ecstasy|ketamine|xanax|adderall|oxy|oxycodone|opioid|meth|crystal|ice|lsd|acid|shrooms|psilocybin|dmt|fentanyl|tramadol|ritalin|benzos|benzo|pill|pharmacy)\b"
 )
 
+# Enhanced NSFW content detection with obfuscation patterns
+nsfw_obfuscation_re = re.compile(
+    r"(?i)(p[o0]rn|pr[o0]n|xxx|s[e3]x|n[u0]de|adult|18\+|onlyfans|escort|camgirl|pornhub|xvideos|xnxx)"
+)
+
 # Child exploitation and sexual violence content detection
 child_exploitation_patterns = [
     r"детск.*порнограф",
@@ -291,6 +296,10 @@ def text_has_nsfw(text: str) -> bool:
         if p in t:
             return True
     
+    # Check for obfuscated NSFW terms (p0rn, pr0n, etc.)
+    if nsfw_obfuscation_re.search(text):
+        return True
+    
     # Also check translated text for non-English content
     translated_text = translate_text(text)
     if translated_text and translated_text != text:
@@ -300,6 +309,9 @@ def text_has_nsfw(text: str) -> bool:
         for p in _bad_phrases:
             if p in t_translated:
                 return True
+        # Check obfuscation patterns in translated text too
+        if nsfw_obfuscation_re.search(translated_text):
+            return True
     
     if _ml_profanity(text):
         return True
