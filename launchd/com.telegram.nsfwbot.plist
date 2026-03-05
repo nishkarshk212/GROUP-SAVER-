@@ -8,14 +8,18 @@
   <string>/Users/nishkarshkr/Desktop/bot-app</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>bash</string>
-    <string>/Users/nishkarshkr/Desktop/bot-app/scripts/run_bot.sh</string>
+    <string>/Users/nishkarshkr/Desktop/bot-app/.venv/bin/python</string>
+    <string>/Users/nishkarshkr/Desktop/bot-app/bot.py</string>
   </array>
   <key>KeepAlive</key>
   <true/>
   <key>RunAtLoad</key>
   <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
   <key>StandardOutPath</key>
   <string>/Users/nishkarshkr/Library/Logs/telegram-nsfwbot.out.log</string>
   <key>StandardErrorPath</key>
