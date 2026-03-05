@@ -149,23 +149,41 @@ def normalize_obfuscated_text(text: str) -> str:
     return text
 
 
+def normalize_repeated_chars(text: str) -> str:
+    """
+    Normalize repeated characters to prevent bypass attempts.
+    Handles: seeeeeeexxxxxxxx -> sex, pooooorn -> porn, etc.
+    """
+    if not text:
+        return text
+    
+    # Reduce multiple consecutive same characters to max 2
+    # This prevents "seeeeeeexxxxxxxx" but keeps "xx" for xxx detection
+    text = re.sub(r'(.)\1{2,}', r'\1\1', text)
+    
+    return text
+
+
 def detect_with_regex_patterns(text: str) -> bool:
     """
     Detect NSFW content using regex patterns for obfuscated terms.
     """
     NSFW_REGEX_PATTERNS = [
-        r"s[e3@]+x+",           # sex, s3x, s@x, seex
-        r"p[o0@]+r+n",          # porn, p0rn, p*rn, pr0n
-        r"p+r+[o0@]+n+",        # pron, pr0n
-        r"x{2,}",               # xxx, xxxx
-        r"n[u*]+d+e?",          # nude, n*de, nuude
-        r"d+\s*m+\s*f+\s*o+\s*r+",  # dm for, d m f o r
+        r"s[e3@]+x+",           # sex, s3x, s@x, seex, seeeeex
+        r"p[o0@]+r+n",          # porn, p0rn, p*rn, pr0n, poooorn
+        r"p+r+[o0@]+n+",        # pron, pr0n, prooon
+        r"x{2,}",               # xxx, xxxx, xxxxxxxx
+        r"n[u*]+d+e?",          # nude, n*de, nuude, nuuuude
+        r"d+\s*m+\s*f+\s*o+\s*r+",  # dm for, d m f o r, dmm foor
         r"18\+?",               # 18+, 18
         r"o+n+l+y+f+a*n+s+",    # onlyfans variations
         r"f+u+c+k+",            # fuck variations
         r"s+h+i+t+",            # shit variations
         r"a+s+s+",              # ass variations
         r"d+i+c+k+",            # dick variations
+        r"s+e+x+",              # sex with repeated chars
+        r"p+o+r+n+",            # porn with repeated chars
+        r"n+u+d+e+",            # nude with repeated chars
     ]
     
     for pattern in NSFW_REGEX_PATTERNS:
@@ -499,6 +517,9 @@ def text_has_nsfw(text: str) -> bool:
     # Normalize obfuscated text (s3x, pr0n, etc.)
     obfuscation_normalized = normalize_obfuscated_text(text)
     
+    # Normalize repeated characters (seeeeeeexxxxxxxx -> sex)
+    repeated_normalized = normalize_repeated_chars(text)
+    
     # Check original text
     t = text.lower()
     if _bad_word_re and _bad_word_re.search(t):
@@ -522,12 +543,22 @@ def text_has_nsfw(text: str) -> bool:
         if p in obfuscation_normalized:
             return True
     
+    # Check repeated character normalized text (handles seeeeeeexxxxxxxx)
+    t_repeated = repeated_normalized.lower()
+    if _bad_word_re and _bad_word_re.search(t_repeated):
+        return True
+    for p in _bad_phrases:
+        if p in t_repeated:
+            return True
+    
     # Check for obfuscated NSFW terms using regex patterns
     if detect_with_regex_patterns(text):
         return True
     if detect_with_regex_patterns(normalized_text):
         return True
     if detect_with_regex_patterns(obfuscation_normalized):
+        return True
+    if detect_with_regex_patterns(repeated_normalized):
         return True
     
     # Check for obfuscated NSFW terms (p0rn, pr0n, etc.)
@@ -1070,7 +1101,7 @@ def main() -> None:
     # Catch-all for ANY other message (text, media, polls, documents, etc.)
     # We use group=1 or just standard handler but filters.ALL (excluding service updates handled above)
     # Actually filters.ALL includes everything. We can just put this last.
-    # But wait, if we want to catch commands too, we should be careful.
+    # But if we want to catch commands too, we should be careful.
     # CommandHandler handles commands and stops propagation if we don't use group.
     # But we want to check NSFW in commands too?
     # If so, we should add a TypeHandler(Update, global_check) or similar.
