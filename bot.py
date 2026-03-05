@@ -756,141 +756,10 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
 
 
 async def user_profile_is_nsfw(user_id: int, context: ContextTypes.DEFAULT_TYPE, threshold: float = 0.7) -> bool:
-    """Check if user's profile photo is NSFW. Respects PFP_NSFWD_ENABLED setting."""
-    # Check if profile photo scanning is disabled
-    enabled = os.environ.get("PFP_NSFWD_ENABLED", os.environ.get("ENABLE_PFP_NSFWD", "1")).strip()
-    if enabled in ("0", "false", "False", "no", "No", "off", "Off"):
-        print(f"Profile photo scanning DISABLED (PFP_NSFWD_ENABLED={enabled})")
-        return False  # Skip profile photo check if disabled
-    
-    if user_id in _pfp_scan_cache:
-        return _pfp_scan_cache[user_id]
-    
-    try:
-        # Get user's profile photos
-        photos = await context.bot.get_user_profile_photos(user_id=user_id, limit=1)
-        if not photos or not photos.total_count:
-            print(f"ℹ️ No profile photos found for user {user_id}")
-            _pfp_scan_cache[user_id] = False
-            return False
-        
-        first = photos.photos[0] if photos.photos else []
-        if not first:
-            print(f"⚠️ Empty photo array for user {user_id}")
-            _pfp_scan_cache[user_id] = False
-            return False
-        
-        # Get the highest resolution photo
-        file_id = first[-1].file_id
-        print(f"📸 Found profile photo for user {user_id}, file_id: {file_id}")
-        
-        # Download the file
-        tg_file = await context.bot.get_file(file_id)
-        
-        # Create temporary file with proper download
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-                tmp_path = tmp.name
-            
-            # Download to the temporary path
-            await tg_file.download_to_custom_path(tmp_path)
-            print(f"✅ Downloaded profile photo to {tmp_path}")
-            
-            nsfw_detected = False
-            
-            # Try NudeClassifier first
-            try:
-                thr_cls = float(os.environ.get("NSFW_PFP_CLS_THRESHOLD", "0.85"))
-            except Exception:
-                thr_cls = 0.85
-            
-            try:
-                thr_det = float(os.environ.get("NSFW_PFP_THRESHOLD", str(threshold)))
-            except Exception:
-                thr_det = threshold
-            
-            if NudeClassifier is not None:
-                global _nude_classifier
-                if _nude_classifier is None:
-                    _nude_classifier = NudeClassifier()
-                
-                try:
-                    cls_res = _nude_classifier.classify(tmp_path)
-                    pred = None
-                    conf = 0.0
-                    
-                    if isinstance(cls_res, dict):
-                        v = cls_res.get(tmp_path)
-                        if v is None and cls_res:
-                            v = next(iter(cls_res.values()))
-                        if isinstance(v, dict):
-                            if "unsafe" in v and isinstance(v["unsafe"], (int, float)):
-                                conf = float(v.get("unsafe", 0.0))
-                                pred = "unsafe"
-                            elif "NSFW" in v and isinstance(v["NSFW"], (int, float)):
-                                conf = float(v.get("NSFW", 0.0))
-                                pred = "nsfw"
-                            elif "confidence" in v and "prediction" in v:
-                                conf = float(v.get("confidence", 0.0))
-                                pred = str(v.get("prediction", "")).lower()
-                    elif isinstance(cls_res, list) and cls_res:
-                        v = cls_res[0]
-                        if isinstance(v, dict):
-                            conf = float(v.get("confidence", 0.0))
-                            pred = str(v.get("prediction", "")).lower()
-                    
-                    print(f"🔍 Classifier result: prediction={pred}, confidence={conf:.2f}, threshold={thr_cls:.2f}")
-                    
-                    if pred in ("unsafe", "nsfw") and conf >= thr_cls:
-                        nsfw_detected = True
-                        print(f"⚠️ NSFW detected by classifier!")
-                except Exception as e:
-                    print(f"⚠️ Classifier error: {e}")
-                    pass
-            
-            # If classifier didn't detect, try NudeDetector
-            if not nsfw_detected:
-                try:
-                    det_res = _nude_detector.detect(tmp_path) or []
-                    print(f"🔍 Detector found {len(det_res)} detections")
-                    
-                    for d in det_res:
-                        try:
-                            sc = float(d.get("score", 0.0))
-                            label = d.get("label", "unknown")
-                        except Exception:
-                            sc = 0.0
-                            label = "unknown"
-                        
-                        print(f"  - {label}: score={sc:.2f}, threshold={thr_det:.2f}")
-                        
-                        if sc >= thr_det:
-                            nsfw_detected = True
-                            print(f"⚠️ NSFW detected by detector ({label})!")
-                            break
-                except Exception as e:
-                    print(f"⚠️ Detector error: {e}")
-                    pass
-            
-            print(f"📊 Final result for user {user_id}: NSFW={nsfw_detected}")
-            
-        finally:
-            # Clean up temporary file
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                    print(f"🗑️ Cleaned up temp file: {tmp_path}")
-                except Exception:
-                    pass
-        
-        _pfp_scan_cache[user_id] = nsfw_detected
-        return nsfw_detected
-        
-    except Exception as e:
-        print(f"❌ Error checking profile photo for user {user_id}: {e}")
-        _pfp_scan_cache[user_id] = False
-        return False
+    """Check if user's profile photo is NSFW. DISABLED - Profile photo scanning is turned off."""
+    # Profile photo scanning is DISABLED
+    print(f"ℹ️ Profile photo scanning is DISABLED for user {user_id}")
+    return False
 
 
 async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1047,6 +916,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 🗑️ 𝐈𝐧𝐬𝐭𝐚𝐧𝐭 𝐌𝐞𝐬𝐬𝐚𝐠𝐞 𝐃𝐞𝐥𝐞𝐭𝐢𝐨𝐧
 🛡️ 𝐊𝐞𝐞𝐩𝐬 𝐘𝐨𝐮𝐫 𝐂𝐨𝐦𝐦𝐮𝐧𝐢𝐭𝐲 𝐂𝐥𝐞𝐚𝐧 & 𝐒𝐚𝐟𝐞
 📊 𝐋𝐨𝐠𝐬 𝐛𝐨𝐭 𝐣𝐨𝐢𝐧/𝐥𝐞𝐚𝐯𝐞 𝐞𝐯𝐞𝐧𝐭𝐬
+⚠️ 𝐏𝐫𝐨𝐟𝐢𝐥𝐞 𝐏𝐡𝐨𝐭𝐨 𝐒𝐜𝐚𝐧𝐧𝐢𝐧𝐠: 𝐃𝐈𝐒𝐀𝐁𝐋𝐄𝐃
 
 👑 𝐌𝐚𝐤𝐞 𝐦𝐞 𝐀𝐝𝐦𝐢𝐧
 ⚙️ 𝐄𝐧𝐣𝐨𝐲 𝐚𝐮𝐭𝐨𝐦𝐚𝐭𝐢𝐜 𝐩𝐫𝐨𝐭𝐞𝐜𝐭𝐢𝐨𝐧"""
@@ -1067,20 +937,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_checkpfp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Command to check profile photo - DISABLED"""
     user = update.effective_user
     chat = update.effective_chat
     if not user or not chat:
         return
-    nsfw = await user_profile_is_nsfw(user.id, context)
-    await send_temp(context, chat.id, ("⚠️ Your profile photo appears NSFW." if nsfw else "✅ Your profile photo looks safe."), 10)
+    await send_temp(context, chat.id, "ℹ️ Profile photo scanning is currently DISABLED.", 10)
 
 async def cmd_checkbotpfp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Command to check bot profile photo - DISABLED"""
     chat = update.effective_chat
     if not chat:
         return
-    me = await context.bot.get_me()
-    nsfw = await user_profile_is_nsfw(me.id, context)
-    await send_temp(context, chat.id, ("⚠️ Bot profile photo appears NSFW." if nsfw else "✅ Bot profile photo looks safe."), 10)
+    await send_temp(context, chat.id, "ℹ️ Profile photo scanning is currently DISABLED.", 10)
 
 async def cmd_whereami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Command for bot owner to check where the bot is running in groups"""
