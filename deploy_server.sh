@@ -75,21 +75,59 @@ else
     echo "⚠️  LOG_CHANNEL_ID not set (optional)"
 fi
 
-echo "=== Step 5: Restart systemd service ==="
+echo "=== Step 5: Setup daily cleanup service ==="
+# Copy cleanup script
+if [ -f "scripts/cleanup_daily.sh" ]; then
+    cp scripts/cleanup_daily.sh $BOT_DIR/scripts/
+    chmod +x $BOT_DIR/scripts/cleanup_daily.sh
+    echo "✅ Cleanup script installed"
+fi
+
+# Copy systemd cleanup service files
+if [ -f "systemd/nsfw-bot-cleanup.service" ]; then
+    cp systemd/nsfw-bot-cleanup.service /etc/systemd/system/
+    echo "✅ Cleanup service file installed"
+fi
+
+if [ -f "systemd/nsfw-bot-cleanup.timer" ]; then
+    cp systemd/nsfw-bot-cleanup.timer /etc/systemd/system/
+    echo "✅ Cleanup timer file installed"
+fi
+
+# Enable and start the cleanup timer
+systemctl daemon-reload
+systemctl enable nsfw-bot-cleanup.timer
+systemctl start nsfw-bot-cleanup.timer
+echo "✅ Daily cleanup timer enabled and started"
+echo ""
+
+echo "=== Step 6: Install logrotate configuration ==="
+if [ -f "logrotate.conf" ]; then
+    cp logrotate.conf /etc/logrotate.d/nsfw-bot
+    echo "✅ Logrotate configuration installed"
+fi
+echo ""
+
+echo "=== Step 7: Restart systemd service ==="
 systemctl daemon-reload
 systemctl restart $SERVICE_NAME
 
-echo "=== Step 6: Wait for service to start ==="
+echo "=== Step 8: Wait for service to start ==="
 sleep 3
 
-echo "=== Step 7: Check service status ==="
+echo "=== Step 9: Check service status ==="
 systemctl is-active $SERVICE_NAME && echo "✅ Service is running" || {
     echo "❌ Service failed to start"
     systemctl status $SERVICE_NAME --no-pager
     exit 1
 }
 
-echo "=== Step 8: Show recent logs ==="
+echo "=== Step 10: Check cleanup timer status ==="
+systemctl is-active nsfw-bot-cleanup.timer && echo "✅ Cleanup timer is active" || echo "⚠️  Cleanup timer not active"
+systemctl list-timers | grep nsfw-bot || echo "ℹ️  Timer info not available"
+echo ""
+
+echo "=== Step 11: Show recent logs ==="
 echo ""
 echo "Last 10 log lines:"
 journalctl -u $SERVICE_NAME -n 10 --no-pager

@@ -1,0 +1,17 @@
+[Unit]
+Description=Daily Cleanup for NSFW Bot
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/nsfw-bot
+ExecStart=/bin/bash /opt/nsfw-bot/scripts/cleanup_daily.sh
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/nsfw-bot /tmp/nsfw-bot /opt/nsfw-bot
+
+[Install]
+WantedBy=multi-user.target

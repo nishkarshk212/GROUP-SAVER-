@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Cleanup for NSFW Bot
+Documentation=man:journalctl(1)
+
+[Trigger]
+# Run daily at 3:00 AM
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
