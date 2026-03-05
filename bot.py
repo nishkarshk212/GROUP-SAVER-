@@ -641,18 +641,23 @@ def profile_has_nsfw(user: User) -> bool:
 
 
 async def _auto_delete(message, seconds: int) -> None:
+    """Auto-delete a message after specified seconds."""
     try:
         await asyncio.sleep(seconds)
         await message.delete()
-    except Exception:
-        pass
+        print(f"✅ Deleted message {message.message_id} in chat {message.chat_id}")
+    except Exception as e:
+        print(f"⚠️ Failed to delete message {message.message_id}: {e}")
+
 
 async def send_temp(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str, seconds: int = 10):
+    """Send a temporary message that auto-deletes after specified seconds."""
     try:
         m = await context.bot.send_message(chat_id=chat_id, text=text)
         asyncio.create_task(_auto_delete(m, seconds))
         return m
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Failed to send temp message: {e}")
         return None
 
 
@@ -679,19 +684,23 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
     # Delete the NSFW message
     try:
         await msg.delete()
-    except Exception:
+        print(f"🗑️ Deleted NSFW message from user {user_id} in chat {chat_id}")
+    except Exception as e:
+        print(f"⚠️ Failed to delete NSFW message: {e}")
         pass
     
     # Send simple warning message to the chat (auto-delete after 10 seconds)
     try:
+        warning_text = f"️ User ID: {user_id} - NSFW content detected!"
         warning_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"⚠️ User ID: {user_id} NSFW content detected!",
-            parse_mode="HTML"
+            text=warning_text
         )
+        print(f"⚠️ Sent warning message {warning_msg.message_id} in chat {chat_id}")
         # Schedule auto-delete after 10 seconds
         asyncio.create_task(_auto_delete(warning_msg, 10))
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Failed to send/delete warning message: {e}")
         pass
     
     # Send detailed info to chat owner/admin (optional logging)
