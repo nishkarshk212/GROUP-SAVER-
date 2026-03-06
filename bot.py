@@ -4,6 +4,7 @@ import asyncio
 import tempfile
 import json
 import unicodedata
+import time
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from typing import Dict, Set
@@ -685,7 +686,6 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
     chat_id = chat.id
     
     # Check if this user was recently warned (prevent spam)
-    import time
     current_time = time.time()
     if user_id in _warned_users:
         time_since_last_warn = current_time - _warned_users[user_id]
