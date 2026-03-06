@@ -667,6 +667,8 @@ async def send_temp(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str,
 
 async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str) -> None:
     """Only detect NSFW content, delete the message, and send warning. No limits, no actions."""
+    global _warned_users  # Declare global to modify the dictionary
+    
     msg = update.effective_message
     if not msg:
         return
