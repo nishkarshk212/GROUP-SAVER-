@@ -1041,6 +1041,12 @@ def main() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         raise RuntimeError("Set TELEGRAM_BOT_TOKEN environment variable.")
+    
+    # Pre-load bad words list at startup
+    print("Loading NSFW word lists...")
+    _load_bad_words()
+    print(f"Loaded {len(_bad_phrases)} phrases and regex pattern ready")
+    
     app = ApplicationBuilder().token(token).build()
     
     # Commands
