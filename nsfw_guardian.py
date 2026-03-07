@@ -1,6 +1,7 @@
 import re
 import sqlite3
 import asyncio
+import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from better_profanity import profanity
@@ -8,9 +9,19 @@ from detoxify import Detoxify
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
-API_ID = 123456
-API_HASH = "YOUR_API_HASH"
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+API_ID = int(os.environ.get("TELEGRAM_API_ID", "123456"))
+API_HASH = os.environ.get("TELEGRAM_API_HASH", "YOUR_API_HASH")
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
+
+# Validate configuration
+if API_ID == 123456 or API_HASH == "YOUR_API_HASH" or BOT_TOKEN == "YOUR_BOT_TOKEN":
+    print("❌ ERROR: Please configure your Telegram credentials via environment variables:")
+    print("   - TELEGRAM_API_ID")
+    print("   - TELEGRAM_API_HASH")
+    print("   - TELEGRAM_BOT_TOKEN")
+    print("\nSet these values or update the hardcoded values in nsfw_guardian.py")
+    import sys
+    sys.exit(1)
 
 bot = Client("nsfw_guardian", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 

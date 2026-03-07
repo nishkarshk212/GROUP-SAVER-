@@ -171,17 +171,18 @@ def detect_with_regex_patterns(text: str) -> bool:
     """
     NSFW_REGEX_PATTERNS = [
         r"s[e3@]+x+",           # sex, s3x, s@x, seex, seeeeex
-        r"p[o0@]+r+n",          # porn, p0rn, p*rn, pr0n, poooorn
-        r"p+r+[o0@]+n+",        # pron, pr0n, prooon
+        r"p[o0@*]+r+n",         # porn, p0rn, p*rn, pr0n, poooorn
+        r"p+r+[o0@*]+n+",       # pron, pr0n, prooon, p*r*n
         r"x{2,}",               # xxx, xxxx, xxxxxxxx
         r"n[u*]+d+e?",          # nude, n*de, nuude, nuuuude
         r"d+\s*m+\s*f+\s*o+\s*r+",  # dm for, d m f o r, dmm foor
         r"18\+?",               # 18+, 18
         r"o+n+l+y+f+a*n+s+",    # onlyfans variations
-        r"f+u+c+k+",            # fuck variations
-        r"s+h+i+t+",            # shit variations
-        r"a+s+s+",              # ass variations
-        r"d+i+c+k+",            # dick variations
+        r"f+[^a-zA-Z0-9]*u?[^a-zA-Z0-9]*c?[^a-zA-Z0-9]*k+",  # fuck variations (handles f**k, f*k, fu*k, fuc*, fk, etc.)
+        r"s+[^a-zA-Z0-9]*h?[^a-zA-Z0-9]*i?[^a-zA-Z0-9]*t+",  # shit variations (handles s**t, s*t, sh*t, shi*, st, etc.)
+        r"a+[^a-zA-Z0-9]*s+[^a-zA-Z0-9]*s+",  # ass variations (handles a*s, a**s, as*, ass, etc.)
+        r"d+[^a-zA-Z0-9]*i?[^a-zA-Z0-9]*c?[^a-zA-Z0-9]*k+",  # dick variations (handles d**k, d*k, di*k, dic*, dk, etc.)
+        r"b+[^a-zA-Z0-9]*i?[^a-zA-Z0-9]*t+[^a-zA-Z0-9]*c?[^a-zA-Z0-9]*h+",  # bitch variations (handles b*tch, b**ch, bi*ch, btch, etc.)
         r"s+e+x+",              # sex with repeated chars
         r"p+o+r+n+",            # porn with repeated chars
         r"n+u+d+e+",            # nude with repeated chars
@@ -209,6 +210,7 @@ def _load_bad_words() -> None:
     _bad_langs = langs
     words = set()
     phrases = set()
+    failed_langs = []
     try:
         os.makedirs(_bad_local_dir, exist_ok=True)
     except Exception:
@@ -220,7 +222,8 @@ def _load_bad_words() -> None:
             if os.path.isfile(local_path):
                 with open(local_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ Failed to load local file for {lang}: {e}")
             data = None
         if data is None:
             url = f"https://cdn.jsdelivr.net/npm/naughty-words/{lang}.json"
@@ -230,13 +233,16 @@ def _load_bad_words() -> None:
                 try:
                     with open(local_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=0)
-                except Exception:
-                    pass
-            except (URLError, HTTPError, TimeoutError, ValueError):
+                except Exception as e:
+                    print(f"⚠️ Failed to cache {lang} locally: {e}")
+            except (URLError, HTTPError, TimeoutError, ValueError) as e:
+                print(f"⚠️ Failed to fetch {lang} from CDN: {e}")
                 data = None
-            except Exception:
+            except Exception as e:
+                print(f"⚠️ Unexpected error fetching {lang}: {e}")
                 data = None
         if not data:
+            failed_langs.append(lang)
             continue
         for item in data:
             s = str(item).strip().lower()
@@ -251,10 +257,20 @@ def _load_bad_words() -> None:
         pattern = r"(?i)\b(?:" + "|".join(escaped) + r")\b"
         try:
             _bad_word_re = re.compile(pattern)
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ Failed to compile regex: {e}")
             _bad_word_re = None
     _bad_phrases = sorted(phrases, key=len, reverse=True)
-    _bad_loaded = True
+    # Only mark as loaded if we successfully loaded at least some words or phrases
+    _bad_loaded = len(words) > 0 or len(phrases) > 0
+    
+    # Log loading results
+    if _bad_loaded:
+        print(f"✅ Loaded NSFW detection: {len(words)} words, {len(phrases)} phrases from {len(langs) - len(failed_langs)}/{len(langs)} languages")
+        if failed_langs:
+            print(f"⚠️ Failed to load languages: {', '.join(failed_langs)}")
+    else:
+        print(f"❌ WARNING: No NSFW words loaded! Check network connection and language files.")
 drug_re = re.compile(
     r"(?i)\b(?:drug|weed|marijuana|cannabis|cocaine|crack|heroin|mdma|molly|ecstasy|ketamine|xanax|adderall|oxy|oxycodone|opioid|meth|crystal|ice|lsd|acid|shrooms|psilocybin|dmt|fentanyl|tramadol|ritalin|benzos|benzo|pill|pharmacy)\b"
 )
