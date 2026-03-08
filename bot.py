@@ -142,10 +142,14 @@ def normalize_obfuscated_text(text: str) -> str:
     for k, v in replace_map.items():
         text = text.replace(k, v)
     
-    # Remove ALL types of whitespace and separators LAST
-    # This handles: S e x, p o r n, d m f o r, etc.
-    # Must be done AFTER character replacement to properly handle "S e x" -> "sex"
-    text = re.sub(r"[\s\u00A0\u2000-\u200B\u202F\u205F\u3000]+", "", text)
+    # Remove spaces ONLY if they appear between EVERY letter (full word obfuscation)
+    # This prevents false positives like "kaise xfxh" being treated as one word
+    # Check if text looks like fully spaced obfuscation (e.g., "s e x" not "kaise ho")
+    words = text.split()
+    if len(words) > 1:
+        # Only remove spaces if all "words" are single characters (obfuscation pattern)
+        if all(len(w) == 1 for w in words):
+            text = ''.join(words)
     
     return text
 
