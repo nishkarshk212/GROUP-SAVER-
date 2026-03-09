@@ -37,6 +37,7 @@ def get_chat_settings(chat_id: int) -> Dict[str, bool]:
             "media_scan": True,
             "username_detect": True,
             "name_detect": True,
+            "voice_invite_scan": True,
         }
     return chat_settings[chat_id]
 
@@ -240,6 +241,10 @@ async def handle_voice_invite(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     settings_dict = get_chat_settings(msg.chat.id)
     
+    # Check if voice invite scanning is enabled
+    if not settings_dict["voice_invite_scan"]:
+        return
+    
     vcpi = msg.video_chat_participants_invited
     users = getattr(vcpi, "users", []) if vcpi else []
     for user in users:
@@ -433,15 +438,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "├ NSFW Text Filtering\n"
             "├ Drug-related Content Detection\n"
             "└ Profile Photo Scanning\n\n"
-            "๏ 𝗨𝘀𝗲𝗿 𝗧𝗿𝗮𝗰𝗸𝗶𝗻𝗴:\n"
-            "├ Username Detection\n"
-            "├ Name Detection\n"
-            "├ Track users who send messages\n"
-            "└ Track users who join groups\n\n"
+            "๏ 𝗩𝗼𝗶𝗰𝗲 𝗖𝗵𝗮𝘁 𝗣𝗿𝗼𝘁𝗲𝗰𝘁𝗶𝗼𝗻:\n"
+            "├ Screen voice chat invites\n"
+            "├ Detect inappropriate usernames\n"
+            "├ Block suspicious users\n"
+            "└ Toggle on/off in settings\n\n"
             "๏ 𝗔𝘂𝘁𝗼-𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
             "├ Auto-delete violating content\n"
             "├ New member screening\n"
-            "├ Voice chat invite screening\n"
             "└ Warning messages\n\n"
             "๏ 𝗖𝘂𝘀𝘁𝗼𝗺𝗶𝘇𝗮𝘁𝗶𝗼𝗻:\n"
             "├ Per-chat settings\n"
@@ -476,6 +480,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
             [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -500,6 +505,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         settings_dict["text_scan"] = not settings_dict["text_scan"]
     elif data == "toggle_media_scan":
         settings_dict["media_scan"] = not settings_dict["media_scan"]
+    elif data == "toggle_voice_invite_scan":
+        settings_dict["voice_invite_scan"] = not settings_dict["voice_invite_scan"]
     elif data == "toggle_username_detect":
         settings_dict["username_detect"] = not settings_dict["username_detect"]
     elif data == "toggle_name_detect":
@@ -513,8 +520,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
-        [InlineKeyboardButton(f"{'✅' if settings_dict['username_detect'] else '❌'} Username Detection", callback_data="toggle_username_detect")],
-        [InlineKeyboardButton(f"{'✅' if settings_dict['name_detect'] else '❌'} Name Detection", callback_data="toggle_name_detect")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
         [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
