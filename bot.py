@@ -79,19 +79,26 @@ chat_settings: Dict[int, Dict[str, bool]] = {}
 
 
 def get_chat_settings(chat_id: int) -> Dict[str, bool]:
-    if chat_id not in chat_settings:
-        chat_settings[chat_id] = {
-            "pfp_scan": True,
-            "text_scan": True,
-            "media_scan": True,
-            "image_scan": True,
-            "weapon_scan": True,
-            "drug_scan": True,
-            "username_detect": True,
-            "name_detect": True,
-            "voice_invite_scan": True,
+   if chat_id not in chat_settings:
+       chat_settings[chat_id] = {
+            # Image Scanning Features
+            "pfp_scan": True,           # Profile photo NSFW scan
+            "image_scan": True,          # General image NSFW scan
+            "weapon_scan": True,         # Weapon detection in images
+            "drug_scan": True,           # Drug detection in images
+            
+            # Text Scanning Features
+            "text_scan": True,           # Text content NSFW/drug/abuse scan
+            "media_scan": True,          # Media file names and captions
+            
+            # User Detection Features (Silent)
+            "username_detect": True,     # Track usernames (silent)
+            "name_detect": True,         # Track names (silent)
+            
+            # Protection Features
+            "voice_invite_scan": True,   # Voice chat invite screening
         }
-    return chat_settings[chat_id]
+   return chat_settings[chat_id]
 
 
 def load_env_from_file(path: str = ".env") -> None:
@@ -535,7 +542,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("⚙ **NSFW Detector Settings**\nToggle settings below:", reply_markup=reply_markup, parse_mode="Markdown")
+    await update.message.reply_text("⚙ **NSFW Detector Settings**\n\nToggle any feature below:", reply_markup=reply_markup, parse_mode="Markdown")
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
