@@ -285,7 +285,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 ➻ ᴀ ғᴀsᴛ & ᴘᴏᴡᴇʀғᴜʟ ᴛᴇʟᴇɢʀᴀᴍ ʙᴏᴛ ᴡɪᴛʜ sᴏᴍᴇ ᴀᴡᴇsᴏᴍᴇ ғᴇᴀᴛᴜʀᴇs.
 
 ──────────────────
-๏ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʜᴇʟᴩ ʙᴜᴛᴛᴏɴ ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴍʏ ᴍᴏᴅᴜʟᴇs ᴀɴᴅ ᴄᴏᴍᴍᴀɴᴅs."""
+๏ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴍʏ ᴍᴏᴅᴜʟᴇs ᴀɴᴅ ᴄᴏᴍᴍᴀɴᴅs."""
+    
+    # Inline keyboard with buttons
+    keyboard = [
+        [InlineKeyboardButton("𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
+        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback"),
+         InlineKeyboardButton("𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
+        [InlineKeyboardButton("𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
+         InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Get bot's profile photo
     try:
@@ -306,6 +316,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_photo(
                     photo=open(tmp_path, 'rb'),
                     caption=welcome_text,
+                    reply_markup=reply_markup,
                     parse_mode="HTML",
                     has_spoiler=True
                 )
@@ -316,11 +327,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     pass
         else:
             # No profile photo, send text only
-            await update.message.reply_text(welcome_text, parse_mode="HTML")
+            await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="HTML")
     except Exception as e:
         print(f"Error sending start message: {e}")
         # Fallback to text-only message
-        await update.message.reply_text(welcome_text, parse_mode="HTML")
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="HTML")
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -358,8 +369,61 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     chat_id = query.message.chat.id
     user_id = query.from_user.id
+    data = query.data
     
-    # Check if user is the creator (owner)
+    # Handle Help button
+    if data == "help_callback":
+        help_text = (
+            "𝗛𝗘𝗟𝗣 - 𝗕𝗢𝗧 𝗙𝗘𝗔𝗧𝗨𝗥𝗘𝗦\n\n"
+            "๏ 𝗖𝗼𝗻𝘁𝗲𝗻𝘁 𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
+            "├ NSFW Image Detection (AI-powered)\n"
+            "├ NSFW Text Filtering\n"
+            "├ Drug-related Content Detection\n"
+            "└ Profile Photo Scanning\n\n"
+            "๏ 𝗔𝘂𝘁𝗼-𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
+            "├ Auto-delete violating content\n"
+            "├ New member screening\n"
+            "├ Voice chat invite screening\n"
+            "└ Warning messages\n\n"
+            "๏ 𝗖𝘂𝘀𝘁𝗼𝗺𝗶𝘇𝗮𝘁𝗶𝗼𝗻:\n"
+            "├ Per-chat settings\n"
+            "├ Toggle features on/off\n"
+            "└ Owner-only controls\n\n"
+            "๏ 𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀:\n"
+            "├ /start - Welcome message\n"
+            "├ /settings - Manage bot settings\n"
+            "└ Add me to your group!\n\n"
+            "𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 @Jayden_212"
+        )
+        keyboard = [[InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="HTML")
+        return
+    
+    # Handle Settings from start menu
+    if data == "settings_callback":
+        # Check if user is the creator (owner)
+        try:
+            member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+            if member.status != 'creator' and query.message.chat.type in ['group', 'supergroup']:
+                await query.answer("❌ Only the group owner can manage settings.", show_alert=True)
+                return
+        except Exception:
+            if query.message.chat.type != 'private':
+                return
+        
+        settings_dict = get_chat_settings(chat_id)
+        keyboard = [
+            [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+            [InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("⚙ **𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦**\n\nToggle features below:\n\n**Note:** Only group owner can change settings.", reply_markup=reply_markup, parse_mode="Markdown")
+        return
+    
+    # Check if user is the creator (owner) for other callbacks
     try:
         member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         if member.status != 'creator' and query.message.chat.type in ['group', 'supergroup']:
@@ -368,9 +432,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception:
         if query.message.chat.type != 'private':
             return
-
+    
     settings_dict = get_chat_settings(chat_id)
-    data = query.data
     
     if data == "toggle_pfp_scan":
         settings_dict["pfp_scan"] = not settings_dict["pfp_scan"]
@@ -378,14 +441,53 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         settings_dict["text_scan"] = not settings_dict["text_scan"]
     elif data == "toggle_media_scan":
         settings_dict["media_scan"] = not settings_dict["media_scan"]
+    elif data == "back_to_start":
+        # Go back to start message
+        await start_from_callback(update, context)
+        return
 
     keyboard = [
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+        [InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text="⚙ **NSFW Detector Settings**\nToggle settings below:", reply_markup=reply_markup, parse_mode="Markdown")
+    await query.edit_message_text(text="⚙ **𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦**\n\nToggle features below:\n\n**Note:** Only group owner can change settings.", reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def start_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Helper function to regenerate start message from callback"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    user = query.from_user
+    bot = await context.bot.get_me()
+    bot_name = bot.first_name or "NSFW Detector"
+    
+    welcome_text = f"""нєу {user.mention_html()}, 🥀
+
+๏ ᴛʜɪs ɪs ❛ {bot_name} ❜ !
+
+➻ ᴀ ғᴀsᴛ & ᴘᴏᴡᴇʀғᴜʟ ᴛᴇʟᴇɢʀᴀᴍ ʙᴏᴛ ᴡɪᴛʜ sᴏᴍᴇ ᴀᴡᴇsᴏᴍᴇ ғᴇᴀᴛᴜʀᴇs.
+
+──────────────────
+๏ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴍʏ ᴍᴏᴅᴜʟᴇs ᴀɴᴅ ᴄᴏᴍᴍᴀɴᴅs."""
+    
+    keyboard = [
+        [InlineKeyboardButton("𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
+        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback"),
+         InlineKeyboardButton("𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
+        [InlineKeyboardButton("𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
+         InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    try:
+        await query.edit_message_text(welcome_text, reply_markup=reply_markup, parse_mode="HTML")
+    except Exception as e:
+        print(f"Error editing message: {e}")
 
 
 if __name__ == "__main__":
