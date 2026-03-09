@@ -272,18 +272,55 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
-    msg = await update.message.reply_text("🔄 Starting NSFW Detector...")
+    
+    user = update.effective_user
+    bot = await context.bot.get_me()
+    bot_name = bot.first_name or "NSFW Detector"
+    
+    # Welcome message
+    welcome_text = f"""нєу {user.mention_html()}, 🥀
 
-    steps = [
-        "🔄 Starting NSFW Detector...\n\n⚙ Loading AI model...",
-        "🔄 Starting NSFW Detector...\n\n⚙ Loading AI model...\n📂 Preparing scanner...",
-        "🔄 Starting NSFW Detector...\n\n⚙ Loading AI model...\n📂 Preparing scanner...\n🛡 Activating protection...",
-        "✅ NSFW Detector Bot Ready!\n\nSend an image to scan."
-    ]
+๏ ᴛʜɪs ɪs ❛ {bot_name} ❜ !
 
-    for step in steps:
-        await asyncio.sleep(1)
-        await msg.edit_text(step)
+➻ ᴀ ғᴀsᴛ & ᴘᴏᴡᴇʀғᴜʟ ᴛᴇʟᴇɢʀᴀᴍ ʙᴏᴛ ᴡɪᴛʜ sᴏᴍᴇ ᴀᴡᴇsᴏᴍᴇ ғᴇᴀᴛᴜʀᴇs.
+
+──────────────────
+๏ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʜᴇʟᴩ ʙᴜᴛᴛᴏɴ ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴍʏ ᴍᴏᴅᴜʟᴇs ᴀɴᴅ ᴄᴏᴍᴍᴀɴᴅs."""
+    
+    # Get bot's profile photo
+    try:
+        photos = await context.bot.get_user_profile_photos(bot.id, limit=1)
+        if photos and photos.total_count > 0:
+            # Get the highest quality photo
+            file_id = photos.photos[0][-1].file_id
+            photo_file = await context.bot.get_file(file_id)
+            
+            # Download and send as spoiler
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            try:
+                await photo_file.download_to_drive(custom_path=tmp_path)
+                
+                # Send photo with spoiler effect and welcome message
+                await update.message.reply_photo(
+                    photo=open(tmp_path, 'rb'),
+                    caption=welcome_text,
+                    parse_mode="HTML",
+                    has_spoiler=True
+                )
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+        else:
+            # No profile photo, send text only
+            await update.message.reply_text(welcome_text, parse_mode="HTML")
+    except Exception as e:
+        print(f"Error sending start message: {e}")
+        # Fallback to text-only message
+        await update.message.reply_text(welcome_text, parse_mode="HTML")
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
