@@ -532,13 +532,24 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     settings_dict = get_chat_settings(chat.id)
     keyboard = [
+        # Image Scanning
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
+        
+        # Text Scanning
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+        
+        # User Detection (Silent)
+        [InlineKeyboardButton(f"{'✅' if settings_dict['username_detect'] else '❌'} Username Tracking", callback_data="toggle_username_detect")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['name_detect'] else '❌'} Name Tracking", callback_data="toggle_name_detect")],
+        
+        # Protection
         [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
+        
+        # Navigation
         [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
