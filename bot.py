@@ -14,6 +14,16 @@ from telegram.ext import (
     filters,
 )
 from nudenet import NudeDetector
+import torch
+from PIL import Image
+
+# Try to load YOLOv5 for weapon/drug detection
+try:
+    weapon_drug_model = torch.hub.load("ultralytics/yolov5", "yolov5s", pretrained=True, verbose=False)
+    WEAPON_DETECTION_ENABLED = True
+except Exception:
+    WEAPON_DETECTION_ENABLED = False
+    weapon_drug_model = None
 
 # Leetspeak conversion map
 LEET_MAP = {
@@ -47,6 +57,12 @@ ABUSE_WORDS = [
     "worthless", "pathetic", "disgusting", "hate", "kill", "die", "suicide"
 ]
 
+# Weapon detection objects
+WEAPON_OBJECTS = ["knife", "gun", "pistol", "rifle", "sword", "weapon", "firearm"]
+
+# Drug objects for image detection
+DRUG_OBJECTS = ["syringe", "pill", "drug", "powder", "capsule", "tablet"]
+
 nsfw_re = re.compile(
     r"(?i)\b(?:porn|xxx|nude|nudity|sex|hentai|blowjob|anal|fetish|cum|sperm|cock|pussy|tits|boobs|lingerie|erotic|camgirl|onlyfans|fap|nudes)\b"
 )
@@ -68,6 +84,9 @@ def get_chat_settings(chat_id: int) -> Dict[str, bool]:
             "pfp_scan": True,
             "text_scan": True,
             "media_scan": True,
+            "image_scan": True,
+            "weapon_scan": True,
+            "drug_scan": True,
             "username_detect": True,
             "name_detect": True,
             "voice_invite_scan": True,
@@ -507,10 +526,13 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     settings_dict = get_chat_settings(chat.id)
     keyboard = [
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
-        [InlineKeyboardButton(f"{'✅' if settings_dict['username_detect'] else '❌'} Username Detection", callback_data="toggle_username_detect")],
-        [InlineKeyboardButton(f"{'✅' if settings_dict['name_detect'] else '❌'} Name Detection", callback_data="toggle_name_detect")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
+        [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⚙ **NSFW Detector Settings**\nToggle settings below:", reply_markup=reply_markup, parse_mode="Markdown")
@@ -575,6 +597,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         settings_dict = get_chat_settings(chat_id)
         keyboard = [
             [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
@@ -598,6 +623,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     if data == "toggle_pfp_scan":
         settings_dict["pfp_scan"] = not settings_dict["pfp_scan"]
+    elif data == "toggle_image_scan":
+        settings_dict["image_scan"] = not settings_dict["image_scan"]
+    elif data == "toggle_weapon_scan":
+        settings_dict["weapon_scan"] = not settings_dict["weapon_scan"]
+    elif data == "toggle_drug_scan":
+        settings_dict["drug_scan"] = not settings_dict["drug_scan"]
     elif data == "toggle_text_scan":
         settings_dict["text_scan"] = not settings_dict["text_scan"]
     elif data == "toggle_media_scan":
@@ -615,6 +646,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     keyboard = [
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['voice_invite_scan'] else '❌'} Voice Invite Scan", callback_data="toggle_voice_invite_scan")],
@@ -658,6 +692,109 @@ async def start_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         print(f"Error editing message: {e}")
 
 
+async def detect_nude(image_path: str) -> bool:
+    """Detect NSFW/porn content in images using NudeNet"""
+    try:
+        result = _nude_detector.detect(image_path) or []
+        # Check if any category has score > 0.7
+        nsfw_detected = any(d.get("score", 0.0) >= 0.7 for d in result)
+        return nsfw_detected
+    except Exception:
+        return False
+
+
+async def detect_weapon(image_path: str) -> bool:
+    """Detect weapons in images using YOLOv5"""
+    if not WEAPON_DETECTION_ENABLED or weapon_drug_model is None:
+        return False
+    
+    try:
+        results = weapon_drug_model(image_path)
+        labels = results.pandas().xyxy[0]["name"].tolist()
+        
+        for item in labels:
+            if item.lower() in WEAPON_OBJECTS:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+async def detect_drugs_image(image_path: str) -> bool:
+    """Detect drug objects in images using YOLOv5"""
+    if not WEAPON_DETECTION_ENABLED or weapon_drug_model is None:
+        return False
+    
+    try:
+        results = weapon_drug_model(image_path)
+        labels = results.pandas().xyxy[0]["name"].tolist()
+        
+        for obj in labels:
+            if obj.lower() in DRUG_OBJECTS:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+async def scan_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Scan photos for NSFW, weapons, and drugs"""
+    msg = update.effective_message
+    if not msg:
+        return
+    
+    chat_id = msg.chat.id
+    settings_dict = get_chat_settings(chat_id)
+    
+    # Check if image scanning is enabled
+    if not settings_dict["image_scan"]:
+        return
+    
+    # Get the highest quality photo
+    photo = msg.photo[-1]
+    file = await context.bot.get_file(photo.file_id)
+    
+    # Download to temporary file
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        await file.download_to_drive(custom_path=tmp_path)
+        
+        # Scan for nudity
+        if settings_dict.get("pfp_scan", True) and await detect_nude(tmp_path):
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - NSFW image detected. Message deleted.", 10)
+            return
+        
+        # Scan for weapons
+        if settings_dict.get("weapon_scan", True) and await detect_weapon(tmp_path):
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - Weapon detected. Message deleted.", 10)
+            return
+        
+        # Scan for drugs
+        if settings_dict.get("drug_scan", True) and await detect_drugs_image(tmp_path):
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - Drug-related content detected. Message deleted.", 10)
+            return
+            
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
     # Load environment variables from .env file
     load_env_from_file()
@@ -681,7 +818,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_member))
     app.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, handle_voice_invite))
-    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL, handle_any_message))
+    app.add_handler(MessageHandler(filters.PHOTO, scan_photo))
+    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL & ~filters.PHOTO, handle_any_message))
     
     print("✅ Bot is starting...")
     app.run_polling()

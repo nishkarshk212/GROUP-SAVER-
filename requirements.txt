@@ -8,4 +8,5 @@ tgcrypto
 better-profanity
 detoxify
 torch
+torchvision
 transformers==4.37.2
