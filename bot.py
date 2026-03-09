@@ -395,7 +395,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "└ Add me to your group!\n\n"
             "𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 @Jayden_212"
         )
-        keyboard = [[InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]]
+        button_back = InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")
+        keyboard = [[button_back]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="HTML")
         return
@@ -417,7 +418,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
-            [InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]
+            [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("⚙ **𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦**\n\nToggle features below:\n\n**Note:** Only group owner can change settings.", reply_markup=reply_markup, parse_mode="Markdown")
@@ -450,7 +451,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
-        [InlineKeyboardButton("« 𝗕𝗔𝗖𝗞 », callback_data="back_to_start")]
+        [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text="⚙ **𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦**\n\nToggle features below:\n\n**Note:** Only group owner can change settings.", reply_markup=reply_markup, parse_mode="Markdown")
