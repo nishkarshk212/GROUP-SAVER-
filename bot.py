@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import tempfile
+import unicodedata
 from typing import Dict, Set
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -13,6 +14,38 @@ from telegram.ext import (
     filters,
 )
 from nudenet import NudeDetector
+
+# Leetspeak conversion map
+LEET_MAP = {
+    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t",
+    "@": "a", "$": "s", "!": "i", "+": "t"
+}
+
+# NSFW emojis to detect
+NSFW_EMOJIS = ["🍑", "🍆", "💦", "🔞", "😈", "👅", "🌭"]
+
+# Extended NSFW word list
+NSFW_WORDS = [
+    "sex", "porn", "nude", "nudes", "xxx", "hentai", "blowjob", "anal",
+    "fetish", "cum", "sperm", "cock", "pussy", "tits", "boobs", "lingerie",
+    "erotic", "camgirl", "onlyfans", "fap", "naked", "hot", "milf", "teen",
+    "dick", "ass", "butt", "thot", "slut", "whore", "bitch"
+]
+
+# Drug-related words
+DRUG_WORDS = [
+    "drug", "weed", "marijuana", "cannabis", "cocaine", "crack", "heroin",
+    "mdma", "molly", "ecstasy", "ketamine", "xanax", "adderall", "oxy",
+    "oxycodone", "opioid", "meth", "crystal", "ice", "lsd", "acid", "shrooms",
+    "psilocybin", "dmt", "fentanyl", "tramadol", "ritalin", "benzos", "benzo",
+    "pill", "pharmacy", "420", "high", "stoned"
+]
+
+# Abuse/hate words (common examples)
+ABUSE_WORDS = [
+    "stupid", "idiot", "dumb", "moron", "retard", "loser", "failure",
+    "worthless", "pathetic", "disgusting", "hate", "kill", "die", "suicide"
+]
 
 nsfw_re = re.compile(
     r"(?i)\b(?:porn|xxx|nude|nudity|sex|hentai|blowjob|anal|fetish|cum|sperm|cock|pussy|tits|boobs|lingerie|erotic|camgirl|onlyfans|fap|nudes)\b"
@@ -61,13 +94,75 @@ def load_env_from_file(path: str = ".env") -> None:
         pass
 
 
-def text_has_nsfw(text: str) -> bool:
+def normalize_text(text: str) -> str:
+    """
+    Advanced text normalization to detect bypass attempts.
+    Handles: unicode fonts, leetspeak, spaces, symbols, repeated letters
+    """
+    # Normalize unicode (convert fancy fonts to ASCII)
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Replace leetspeak characters
+    for leet, char in LEET_MAP.items():
+        text = text.replace(leet, char)
+    
+    # Remove all non-alphabetic characters (spaces, symbols, dots, etc.)
+    text = re.sub(r'[^a-z]', '', text)
+    
+    # Reduce repeated letters (e.g., "seeeex" → "sex")
+    text = re.sub(r'(.)\1+', r'\1', text)
+    
+    return text
+
+
+def detect_nsfw_advanced(text: str) -> bool:
+    """
+    Advanced NSFW detection with normalization and emoji detection.
+    """
     if not text:
         return False
-    return bool(nsfw_re.search(text))
+    
+    # Check for NSFW emojis first
+    for emoji in NSFW_EMOJIS:
+        if emoji in text:
+            return True
+    
+    # Normalize and check against word lists
+    cleaned = normalize_text(text)
+    
+    # Check NSFW words
+    for word in NSFW_WORDS:
+        if word in cleaned:
+            return True
+    
+    # Check drug words
+    for word in DRUG_WORDS:
+        if word in cleaned:
+            return True
+    
+    # Check abuse words
+    for word in ABUSE_WORDS:
+        if word in cleaned:
+            return True
+    
+    # Also check with original regex for backward compatibility
+    if nsfw_re.search(text) or drug_re.search(text):
+        return True
+    
+    return False
+
+
+def text_has_nsfw(text: str) -> bool:
+    """Legacy function - now uses advanced detection"""
+    return detect_nsfw_advanced(text)
 
 
 def profile_has_drug(user: User) -> bool:
+    """Check user profile for drug-related terms"""
     parts = []
     if user.first_name:
         parts.append(user.first_name)
@@ -75,9 +170,11 @@ def profile_has_drug(user: User) -> bool:
         parts.append(user.last_name)
     parts.append(user.username or "")
     combined = " ".join(parts)
-    return bool(drug_re.search(combined))
+    return bool(drug_re.search(combined)) or detect_nsfw_advanced(combined)
+
 
 def profile_has_nsfw(user: User) -> bool:
+    """Check user profile for NSFW/drug/abuse terms"""
     parts = []
     if user.first_name:
         parts.append(user.first_name)
@@ -85,7 +182,7 @@ def profile_has_nsfw(user: User) -> bool:
         parts.append(user.last_name)
     parts.append(user.username or "")
     combined = " ".join(parts)
-    return bool(nsfw_re.search(combined))
+    return detect_nsfw_advanced(combined)
 
 
 async def _auto_delete(message, seconds: int) -> None:
