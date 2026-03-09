@@ -28,12 +28,15 @@ _nude_detector = NudeDetector()
 # Global settings for each chat
 chat_settings: Dict[int, Dict[str, bool]] = {}
 
+
 def get_chat_settings(chat_id: int) -> Dict[str, bool]:
     if chat_id not in chat_settings:
         chat_settings[chat_id] = {
             "pfp_scan": True,
             "text_scan": True,
             "media_scan": True,
+            "username_detect": True,
+            "name_detect": True,
         }
     return chat_settings[chat_id]
 
@@ -99,15 +102,40 @@ async def send_temp(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str,
     except Exception:
         return None
 
+def get_user_info(user: User) -> str:
+    """Get formatted user info including username and name"""
+    parts = []
+    if user.first_name:
+        parts.append(f"First Name: {user.first_name}")
+    if user.last_name:
+        parts.append(f"Last Name: {user.last_name}")
+    if user.username:
+        parts.append(f"Username: @{user.username}")
+    if not parts:
+        parts.append(f"User ID: {user.id}")
+    return " | ".join(parts)
 
 async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str) -> None:
     msg = update.effective_message
     if not msg:
         return
     user_id = None
+    user_info_text = ""
     try:
         if msg.from_user:
             user_id = msg.from_user.id
+            settings_dict = get_chat_settings(msg.chat.id)
+            # Build user info text based on settings
+            if settings_dict["username_detect"] or settings_dict["name_detect"]:
+                user_info_parts = []
+                if settings_dict["name_detect"] and msg.from_user.first_name:
+                    user_info_parts.append(f"Name: {msg.from_user.first_name}")
+                    if msg.from_user.last_name:
+                        user_info_parts[-1] += f" {msg.from_user.last_name}"
+                if settings_dict["username_detect"] and msg.from_user.username:
+                    user_info_parts.append(f"@{msg.from_user.username}")
+                if user_info_parts:
+                    user_info_text = " | ".join(user_info_parts)
     except Exception:
         user_id = None
     try:
@@ -117,7 +145,10 @@ async def warn_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, re
     try:
         chat_id = msg.chat.id
         if user_id is not None:
-            await send_temp(context, chat_id, f"Moderation: user_id={user_id} content removed ({reason}).", 10)
+            if user_info_text:
+                await send_temp(context, chat_id, f"Moderation: {user_info_text} (ID={user_id}) content removed ({reason}).", 10)
+            else:
+                await send_temp(context, chat_id, f"Moderation: user_id={user_id} content removed ({reason}).", 10)
         else:
             await send_temp(context, chat_id, f"Moderation: content removed ({reason}).", 10)
     except Exception:
@@ -168,6 +199,12 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     for user in msg.new_chat_members or []:
         if not user or user.is_bot:
             continue
+        
+        # Log username/name if detection is enabled
+        if settings_dict["username_detect"] or settings_dict["name_detect"]:
+            user_info = get_user_info(user)
+            await send_temp(context, msg.chat.id, f"👥 Joined: {user_info}", 15)
+        
         if await user_profile_is_nsfw(user.id, context):
             await warn_and_delete(update, context, "NSFW profile photo detected")
             return
@@ -223,6 +260,17 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     chat_id = msg.chat.id
     settings_dict = get_chat_settings(chat_id)
+    
+    # Log username/name when user sends a message (if enabled)
+    if msg.from_user and not msg.from_user.is_bot:
+        if settings_dict["username_detect"] or settings_dict["name_detect"]:
+            user_info = get_user_info(msg.from_user)
+            # Only log once per session to avoid spam
+            if chat_id not in alerted_users_per_chat:
+                alerted_users_per_chat[chat_id] = set()
+            if msg.from_user.id not in alerted_users_per_chat[chat_id]:
+                alerted_users_per_chat[chat_id].add(msg.from_user.id)
+                await send_temp(context, chat_id, f"💬 {user_info} sent a message", 10)
     
     # Check profile
     if settings_dict["pfp_scan"] and msg.from_user and not msg.from_user.is_bot:
@@ -356,6 +404,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['username_detect'] else '❌'} Username Detection", callback_data="toggle_username_detect")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['name_detect'] else '❌'} Name Detection", callback_data="toggle_name_detect")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⚙ **NSFW Detector Settings**\nToggle settings below:", reply_markup=reply_markup, parse_mode="Markdown")
@@ -380,6 +430,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "├ NSFW Text Filtering\n"
             "├ Drug-related Content Detection\n"
             "└ Profile Photo Scanning\n\n"
+            "๏ 𝗨𝘀𝗲𝗿 𝗧𝗿𝗮𝗰𝗸𝗶𝗻𝗴:\n"
+            "├ Username Detection\n"
+            "├ Name Detection\n"
+            "├ Track users who send messages\n"
+            "└ Track users who join groups\n\n"
             "๏ 𝗔𝘂𝘁𝗼-𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
             "├ Auto-delete violating content\n"
             "├ New member screening\n"
@@ -442,6 +497,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         settings_dict["text_scan"] = not settings_dict["text_scan"]
     elif data == "toggle_media_scan":
         settings_dict["media_scan"] = not settings_dict["media_scan"]
+    elif data == "toggle_username_detect":
+        settings_dict["username_detect"] = not settings_dict["username_detect"]
+    elif data == "toggle_name_detect":
+        settings_dict["name_detect"] = not settings_dict["name_detect"]
     elif data == "back_to_start":
         # Go back to start message
         await start_from_callback(update, context)
@@ -451,6 +510,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(f"{'✅' if settings_dict['pfp_scan'] else '❌'} Profile Photo Scan", callback_data="toggle_pfp_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['media_scan'] else '❌'} Media Scan", callback_data="toggle_media_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['username_detect'] else '❌'} Username Detection", callback_data="toggle_username_detect")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['name_detect'] else '❌'} Name Detection", callback_data="toggle_name_detect")],
         [InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
