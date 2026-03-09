@@ -289,11 +289,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Inline keyboard with buttons
     keyboard = [
-        [InlineKeyboardButton("𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
-        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback"),
-         InlineKeyboardButton("𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
-        [InlineKeyboardButton("𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
-         InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
+        [InlineKeyboardButton(text="𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
+        [InlineKeyboardButton(text="𝗛𝗲𝗹𝗽", callback_data="help_callback"),
+         InlineKeyboardButton(text="𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
+        [InlineKeyboardButton(text="𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
+         InlineKeyboardButton(text="𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
