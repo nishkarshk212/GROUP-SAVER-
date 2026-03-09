@@ -202,28 +202,13 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Check for NSFW/drug terms in username/name FIRST
         if profile_has_nsfw(user) or profile_has_drug(user):
-            # Get user info
-            user_parts = []
-            if user.first_name:
-                user_parts.append(f"Name: {user.first_name}")
-                if user.last_name:
-                    user_parts[-1] += f" {user.last_name}"
-            if user.username:
-                user_parts.append(f"@{user.username}")
-            user_info_str = " | ".join(user_parts) if user_parts else f"User ID: {user.id}"
-            
-            # Send warning and kick user
-            await send_temp(context, msg.chat.id, f"⚠️ Moderation: {user_info_str} (ID={user.id}) - NSFW/inappropriate terms detected in name/username. User will be removed.", 10)
+            # Send warning with ONLY User ID (no name/username shown)
+            await send_temp(context, msg.chat.id, f"⚠️ Moderation: User ID `{user.id}` - NSFW/inappropriate terms detected. User will be removed.", 10)
             try:
                 await context.bot.ban_chat_member(chat_id=msg.chat.id, user_id=user.id)
             except Exception:
                 pass
             return
-        
-        # Log username/name if detection is enabled
-        if settings_dict["username_detect"] or settings_dict["name_detect"]:
-            user_info = get_user_info(user)
-            await send_temp(context, msg.chat.id, f"👥 Joined: {user_info}", 15)
         
         if await user_profile_is_nsfw(user.id, context):
             await warn_and_delete(update, context, "NSFW profile photo detected")
@@ -263,18 +248,8 @@ async def handle_voice_invite(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # Check for NSFW/drug terms in username/name FIRST
         if profile_has_nsfw(user) or profile_has_drug(user):
-            # Get user info
-            user_parts = []
-            if user.first_name:
-                user_parts.append(f"Name: {user.first_name}")
-                if user.last_name:
-                    user_parts[-1] += f" {user.last_name}"
-            if user.username:
-                user_parts.append(f"@{user.username}")
-            user_info_str = " | ".join(user_parts) if user_parts else f"User ID: {user.id}"
-            
-            # Send warning
-            await send_temp(context, msg.chat.id, f"⚠️ Moderation: Invited user {user_info_str} (ID={user.id}) has NSFW/inappropriate terms in name/username. Invitation blocked.", 10)
+            # Send warning with ONLY User ID (no name/username shown)
+            await send_temp(context, msg.chat.id, f"⚠️ Moderation: User ID `{user.id}` - NSFW/inappropriate terms detected. Invitation blocked.", 10)
             return
         
         if await user_profile_is_nsfw(user.id, context):
@@ -294,35 +269,15 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if msg.from_user and not msg.from_user.is_bot:
         # Check if username or name contains NSFW/drug terms
         if profile_has_nsfw(msg.from_user) or profile_has_drug(msg.from_user):
-            # Get user info for logging
-            user_parts = []
-            if msg.from_user.first_name:
-                user_parts.append(f"Name: {msg.from_user.first_name}")
-                if msg.from_user.last_name:
-                    user_parts[-1] += f" {msg.from_user.last_name}"
-            if msg.from_user.username:
-                user_parts.append(f"@{msg.from_user.username}")
-            user_info_str = " | ".join(user_parts) if user_parts else f"User ID: {msg.from_user.id}"
-            
             # Delete the message immediately
             try:
                 await msg.delete()
             except Exception:
                 pass
             
-            # Send warning with user ID (will auto-delete)
-            await send_temp(context, chat_id, f"⚠️ Moderation: {user_info_str} (ID={msg.from_user.id}) - NSFW/inappropriate terms detected in name/username. Message deleted.", 10)
+            # Send warning with ONLY User ID (no name/username shown)
+            await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - NSFW/inappropriate terms detected. Message deleted.", 10)
             return
-        
-        # Log username/name when user sends a message (if enabled)
-        if settings_dict["username_detect"] or settings_dict["name_detect"]:
-            user_info = get_user_info(msg.from_user)
-            # Only log once per session to avoid spam
-            if chat_id not in alerted_users_per_chat:
-                alerted_users_per_chat[chat_id] = set()
-            if msg.from_user.id not in alerted_users_per_chat[chat_id]:
-                alerted_users_per_chat[chat_id].add(msg.from_user.id)
-                await send_temp(context, chat_id, f"💬 {user_info} sent a message", 10)
     
     # Check profile photo
     if settings_dict["pfp_scan"] and msg.from_user and not msg.from_user.is_bot:
