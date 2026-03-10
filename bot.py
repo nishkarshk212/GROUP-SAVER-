@@ -3,6 +3,7 @@ import re
 import asyncio
 import tempfile
 import unicodedata
+from datetime import datetime
 from typing import Dict, Set
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -340,23 +341,145 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
  
 async def handle_left_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    msg = update.message
-    if not msg or not msg.left_chat_member:
-        return
+   msg = update.message
+   if not msg or not msg.left_chat_member:
+       return
     
-    settings_dict = get_chat_settings(msg.chat.id)
-    if not settings_dict["pfp_scan"]:
-        return
+   settings_dict = get_chat_settings(msg.chat.id)
+   if not settings_dict["pfp_scan"]:
+       return
 
     user = msg.left_chat_member
-    if user and not user.is_bot:
-        if await user_profile_is_nsfw(user.id, context):
+   if user and not user.is_bot:
+       if await user_profile_is_nsfw(user.id, context):
             await warn_and_delete(update, context, "NSFW profile photo detected")
-            return
-        if profile_has_drug(user) or profile_has_nsfw(user):
+           return
+       if profile_has_drug(user) or profile_has_nsfw(user):
             await warn_and_delete(update, context, "User has restricted terms in name/username")
- 
- 
+           return
+
+
+async def log_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE, event_type: str, extra_info: str = "") -> None:
+    """Send detailed logs to the log channel with group info, user details, and invite links"""
+    try:
+        log_channel_id = os.environ.get("LOG_CHANNEL_ID")
+       if not log_channel_id:
+           return
+        
+        chat = update.effective_chat
+        user = update.effective_user
+        
+       if not chat:
+           return
+        
+        # Get chat details
+        chat_title = chat.title if chat.title else "Private Chat"
+        chat_id = chat.id
+        chat_type = chat.type
+        
+        # Get invite link for groups/channels
+        invite_link = "Not available"
+        try:
+           if chat.type in ['group', 'supergroup', 'channel']:
+                bot_member= await context.bot.get_chat_member(chat_id=chat.id, user_id=context.bot.id)
+               if bot_member.status in ['administrator', 'creator']:
+                    invite_link = await context.bot.export_chat_invite_link(chat.id)
+        except Exception:
+            pass
+        
+        # Build user information
+        user_info = ""
+       if user:
+            user_parts = []
+           if user.first_name:
+                user_parts.append(f"Name: {user.first_name}")
+           if user.last_name:
+                user_parts[-1] += f" {user.last_name}"
+           if user.username:
+                user_parts.append(f"@{user.username}")
+           if user.id:
+                user_parts.append(f"ID: {user.id}")
+            user_info = " | ".join(user_parts) if user_parts else f"ID: {user.id}"
+        
+        # Get message content if exists
+        message_info = ""
+       if update.effective_message:
+           msg = update.effective_message
+           if msg.text:
+                message_info = f"\n📝 Message: {msg.text[:300]}"
+            elif msg.caption:
+                message_info = f"\n📝 Caption: {msg.caption[:300]}"
+            elif msg.photo:
+                message_info = "\n📷 Photo sent"
+            elif msg.video:
+                message_info = "\n🎥 Video sent"
+            elif msg.document:
+                message_info = "\n📁 Document sent"
+            elif msg.voice:
+                message_info = "\n🎤 Voice message sent"
+            elif msg.sticker:
+                message_info = "\n⭐️ Sticker sent"
+        
+        # Format log message
+        log_text= f"""{event_type}
+
+👥 <b>Group Information:</b>
+├ Title: {chat_title}
+├ ID: <code>{chat_id}</code>
+└ Invite Link: {invite_link}
+
+👤 <b>User Details:</b>
+{user_info}
+{message_info}
+
+⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+━━━━━━━━━━━━━━━━━━━━"""
+        
+        # Send to log channel
+        await context.bot.send_message(
+            chat_id=log_channel_id,
+            text=log_text,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print(f"Error sending log: {e}")
+
+
+async def handle_new_members_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log when new members join"""
+   msg = update.message
+   if not msg or not msg.new_chat_members:
+       return
+    
+    for user in msg.new_chat_members:
+       if user and not user.is_bot:
+            await log_to_channel(update, context, "🟢 NEW MEMBER JOINED")
+
+
+async def handle_left_member_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log when members leave"""
+   msg = update.message
+   if not msg or not msg.left_chat_member:
+       return
+    
+    user = msg.left_chat_member
+   if user and not user.is_bot:
+        await log_to_channel(update, context, "🔴 MEMBER LEFT")
+
+
+async def log_message_activity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log all message activities"""
+   msg = update.effective_message
+   if not msg or not msg.from_user:
+       return
+    
+    # Skip logging in private chats
+   if msg.chat.type == 'private':
+       return
+    
+    await log_to_channel(update, context, "💬 MESSAGE ACTIVITY")
+
+
 async def handle_voice_invite(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.message
     if not msg or not msg.video_chat_participants_invited:
@@ -469,9 +592,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Inline keyboard with buttons
     keyboard = [
         [InlineKeyboardButton("𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
-        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback")],
+        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback"),
+         InlineKeyboardButton("𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
         [InlineKeyboardButton("𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
-       InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
+         InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -850,6 +974,11 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, handle_voice_invite))
     app.add_handler(MessageHandler(filters.PHOTO, scan_photo))
     app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL & ~filters.PHOTO, handle_any_message))
+    
+    # Add logging handlers (run after main handlers)
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members_log))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_member_log))
+    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL & ~filters.PHOTO, log_message_activity))
     
     print("✅ Bot is starting...")
     app.run_polling()
