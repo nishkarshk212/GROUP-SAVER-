@@ -82,21 +82,21 @@ def get_chat_settings(chat_id: int) -> Dict[str, bool]:
    if chat_id not in chat_settings:
        chat_settings[chat_id] = {
             # Image Scanning Features
-            "pfp_scan": True,           # Profile photo NSFW scan
-            "image_scan": True,          # General image NSFW scan
-            "weapon_scan": True,         # Weapon detection in images
-            "drug_scan": True,           # Drug detection in images
+            "pfp_scan": False,           # Profile photo NSFW scan - DISABLED BY DEFAULT
+            "image_scan": False,          # General image NSFW scan - DISABLED BY DEFAULT
+            "weapon_scan": False,         # Weapon detection in images - DISABLED BY DEFAULT
+            "drug_scan": False,           # Drug detection in images - DISABLED BY DEFAULT
             
             # Text Scanning Features
-            "text_scan": True,           # Text content NSFW/drug/abuse scan
-            "media_scan": True,          # Media file names and captions
+            "text_scan": False,           # Text content NSFW/drug/abuse scan - DISABLED BY DEFAULT
+            "media_scan": False,          # Media file names and captions - DISABLED BY DEFAULT
             
             # User Detection Features (Silent)
-            "username_detect": False,    # Track usernames (silent) - DISABLED BY DEFAULT
-            "name_detect": False,        # Track names (silent) - DISABLED BY DEFAULT
+            "username_detect": True,     # Track usernames (silent) - ENABLED BY DEFAULT
+            "name_detect": True,         # Track names (silent) - ENABLED BY DEFAULT
             
             # Protection Features
-            "voice_invite_scan": True,   # Voice chat invite screening
+            "voice_invite_scan": False,   # Voice chat invite screening - DISABLED BY DEFAULT
         }
    return chat_settings[chat_id]
 
