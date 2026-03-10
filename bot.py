@@ -92,8 +92,8 @@ def get_chat_settings(chat_id: int) -> Dict[str, bool]:
             "media_scan": True,          # Media file names and captions
             
             # User Detection Features (Silent)
-            "username_detect": True,     # Track usernames (silent)
-            "name_detect": True,         # Track names (silent)
+            "username_detect": False,    # Track usernames (silent) - DISABLED BY DEFAULT
+            "name_detect": False,        # Track names (silent) - DISABLED BY DEFAULT
             
             # Protection Features
             "voice_invite_scan": True,   # Voice chat invite screening
