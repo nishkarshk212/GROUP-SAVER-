@@ -468,11 +468,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Inline keyboard with buttons
     keyboard = [
-        [InlineKeyboardButton(text="𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
-        [InlineKeyboardButton(text="𝗛𝗲𝗹𝗽", callback_data="help_callback"),
-         InlineKeyboardButton(text="𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", callback_data="settings_callback")],
-        [InlineKeyboardButton(text="𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
-         InlineKeyboardButton(text="𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
+        [InlineKeyboardButton("𝗔𝗱𝗱 𝗺𝗲", url=f"https://t.me/{bot.username}?startgroup=new")],
+        [InlineKeyboardButton("𝗛𝗲𝗹𝗽", callback_data="help_callback")],
+        [InlineKeyboardButton("𝗢𝘄𝗻𝗲𝗿 ♛", url="https://t.me/Jayden_212"),
+       InlineKeyboardButton("𝐔𝐩𝐝𝐚𝐭𝐞𝐬", url="https://t.me/Tele_212_bots")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -568,30 +567,30 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     # Handle Help button
     if data == "help_callback":
-        help_text = (
-            "𝗛𝗘𝗟𝗣 - 𝗕𝗢𝗧 𝗙𝗘𝗔𝗧𝗨𝗥𝗘𝗦\n\n"
-            "๏ 𝗖𝗼𝗻𝘁𝗲𝗻𝘁 𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
-            "├ NSFW Image Detection (AI-powered)\n"
-            "├ NSFW Text Filtering\n"
-            "├ Drug-related Content Detection\n"
-            "└ Profile Photo Scanning\n\n"
-            "๏ 𝗩𝗼𝗶𝗰𝗲 𝗖𝗵𝗮𝘁 𝗣𝗿𝗼𝘁𝗲𝗰𝘁𝗶𝗼𝗻:\n"
-            "├ Screen voice chat invites\n"
-            "├ Detect inappropriate usernames\n"
-            "├ Block suspicious users\n"
-            "└ Toggle on/off in settings\n\n"
-            "๏ 𝗔𝘂𝘁𝗼-𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\n"
-            "├ Auto-delete violating content\n"
-            "├ New member screening\n"
-            "└ Warning messages\n\n"
-            "๏ 𝗖𝘂𝘀𝘁𝗼𝗺𝗶𝘇𝗮𝘁𝗶𝗼𝗻:\n"
-            "├ Per-chat settings\n"
-            "├ Toggle features on/off\n"
-            "└ Owner-only controls\n\n"
-            "๏ 𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀:\n"
-            "├ /start - Welcome message\n"
-            "├ /settings - Manage bot settings\n"
-            "└ Add me to your group!\n\n"
+        help_text= (
+            "𝗛𝗘𝗟𝗣 - 𝗕𝗢𝗧 𝗙𝗘𝗔𝗧𝗨𝗥𝗘𝗦\\n\\n"
+            "๏ 𝗖𝗼𝗻𝘁𝗲𝗻𝘁 𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\\n"
+            "├ NSFW Image Detection (AI-powered)\\n"
+            "├ NSFW Text Filtering\\n"
+            "├ Drug-related Content Detection\\n"
+            "└ Profile Photo Scanning\\n\\n"
+            "๏ 𝗩𝗼𝗶𝗰𝗲 𝗖𝗵𝗮𝘁 𝗣𝗿𝗼𝘁𝗲𝗰𝘁𝗶𝗼𝗻:\\n"
+            "├ Screen voice chat invites\\n"
+            "├ Detect inappropriate usernames\\n"
+            "├ Block suspicious users\\n"
+            "└ Toggle on/off in settings\\n\\n"
+            "๏ 𝗔𝘂𝘁𝗼-𝗠𝗼𝗱𝗲𝗿𝗮𝘁𝗶𝗼𝗻:\\n"
+            "├ Auto-delete violating content\\n"
+            "├ New member screening\\n"
+            "└ Warning messages\\n\\n"
+            "๏ 𝗖𝘂𝘀𝘁𝗼𝗺𝗶𝘇𝗮𝘁𝗶𝗼𝗻:\\n"
+            "├ Per-chat settings\\n"
+            "├ Toggle features on/off\\n"
+            "└ Owner-only controls\\n\\n"
+            "๏ 𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀:\\n"
+            "├ /start - Welcome message\\n"
+            "├ /settings - Manage bot settings\\n"
+            "└ Add me to your group!\\n\\n"
             "𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 @Jayden_212"
         )
         button_back = InlineKeyboardButton(text="« BACK »", callback_data="back_to_start")
@@ -600,6 +599,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="HTML")
         return
     
+    # Check if user is the creator (owner) for other callbacks
+
     # Handle Settings from start menu
     if data == "settings_callback":
         # Check if user is the creator (owner)
