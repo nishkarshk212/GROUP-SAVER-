@@ -87,6 +87,7 @@ def get_chat_settings(chat_id: int) -> Dict[str, bool]:
             "image_scan": False,          # General image NSFW scan - DISABLED BY DEFAULT
             "weapon_scan": False,         # Weapon detection in images - DISABLED BY DEFAULT
             "drug_scan": False,           # Drug detection in images - DISABLED BY DEFAULT
+            "sticker_scan": False,        # Sticker NSFW scan - DISABLED BY DEFAULT
             
             # Text Scanning Features
             "text_scan": False,           # Text content NSFW/drug/abuse scan - DISABLED BY DEFAULT
@@ -349,13 +350,13 @@ async def handle_left_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
    if not settings_dict["pfp_scan"]:
        return
 
-    user = msg.left_chat_member
+   user = msg.left_chat_member
    if user and not user.is_bot:
        if await user_profile_is_nsfw(user.id, context):
-            await warn_and_delete(update, context, "NSFW profile photo detected")
+           await warn_and_delete(update, context, "NSFW profile photo detected")
            return
        if profile_has_drug(user) or profile_has_nsfw(user):
-            await warn_and_delete(update, context, "User has restricted terms in name/username")
+           await warn_and_delete(update, context, "User has restricted terms in name/username")
            return
 
 
@@ -363,14 +364,14 @@ async def log_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE, eve
     """Send detailed logs to the log channel with group info, user details, and invite links"""
     try:
         log_channel_id = os.environ.get("LOG_CHANNEL_ID")
-       if not log_channel_id:
-           return
+        if not log_channel_id:
+            return
         
         chat = update.effective_chat
         user = update.effective_user
         
-       if not chat:
-           return
+        if not chat:
+            return
         
         # Get chat details
         chat_title = chat.title if chat.title else "Private Chat"
@@ -380,32 +381,32 @@ async def log_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE, eve
         # Get invite link for groups/channels
         invite_link = "Not available"
         try:
-           if chat.type in ['group', 'supergroup', 'channel']:
+            if chat.type in ['group', 'supergroup', 'channel']:
                 bot_member= await context.bot.get_chat_member(chat_id=chat.id, user_id=context.bot.id)
-               if bot_member.status in ['administrator', 'creator']:
+                if bot_member.status in ['administrator', 'creator']:
                     invite_link = await context.bot.export_chat_invite_link(chat.id)
         except Exception:
             pass
         
         # Build user information
         user_info = ""
-       if user:
+        if user:
             user_parts = []
-           if user.first_name:
+            if user.first_name:
                 user_parts.append(f"Name: {user.first_name}")
-           if user.last_name:
+            if user.last_name:
                 user_parts[-1] += f" {user.last_name}"
-           if user.username:
+            if user.username:
                 user_parts.append(f"@{user.username}")
-           if user.id:
+            if user.id:
                 user_parts.append(f"ID: {user.id}")
             user_info = " | ".join(user_parts) if user_parts else f"ID: {user.id}"
         
         # Get message content if exists
         message_info = ""
-       if update.effective_message:
-           msg = update.effective_message
-           if msg.text:
+        if update.effective_message:
+            msg = update.effective_message
+            if msg.text:
                 message_info = f"\n📝 Message: {msg.text[:300]}"
             elif msg.caption:
                 message_info = f"\n📝 Caption: {msg.caption[:300]}"
@@ -447,35 +448,35 @@ async def log_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE, eve
 
 async def handle_new_members_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log when new members join"""
-   msg = update.message
-   if not msg or not msg.new_chat_members:
-       return
+    msg = update.message
+    if not msg or not msg.new_chat_members:
+        return
     
     for user in msg.new_chat_members:
-       if user and not user.is_bot:
+        if user and not user.is_bot:
             await log_to_channel(update, context, "🟢 NEW MEMBER JOINED")
 
 
 async def handle_left_member_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log when members leave"""
-   msg = update.message
-   if not msg or not msg.left_chat_member:
-       return
+    msg = update.message
+    if not msg or not msg.left_chat_member:
+        return
     
     user = msg.left_chat_member
-   if user and not user.is_bot:
+    if user and not user.is_bot:
         await log_to_channel(update, context, "🔴 MEMBER LEFT")
 
 
 async def log_message_activity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log all message activities"""
-   msg = update.effective_message
-   if not msg or not msg.from_user:
-       return
+    msg = update.effective_message
+    if not msg or not msg.from_user:
+        return
     
     # Skip logging in private chats
-   if msg.chat.type == 'private':
-       return
+    if msg.chat.type == 'private':
+        return
     
     await log_to_channel(update, context, "💬 MESSAGE ACTIVITY")
 
@@ -660,6 +661,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
         [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
+        [InlineKeyboardButton(f"{'✅' if settings_dict['sticker_scan'] else '❌'} Sticker NSFW Scan", callback_data="toggle_sticker_scan")],
         
         # Text Scanning
         [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
@@ -744,6 +746,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             [InlineKeyboardButton(f"{'✅' if settings_dict['image_scan'] else '❌'} Image Scan (NSFW)", callback_data="toggle_image_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['weapon_scan'] else '❌'} Weapon Detection", callback_data="toggle_weapon_scan")],
             [InlineKeyboardButton(f"{'✅' if settings_dict['drug_scan'] else '❌'} Drug Detection", callback_data="toggle_drug_scan")],
+            [InlineKeyboardButton(f"{'✅' if settings_dict['sticker_scan'] else '❌'} Sticker NSFW Scan", callback_data="toggle_sticker_scan")],
             
             # Text Scanning
             [InlineKeyboardButton(f"{'✅' if settings_dict['text_scan'] else '❌'} Text Content Scan", callback_data="toggle_text_scan")],
@@ -783,6 +786,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         settings_dict["weapon_scan"] = not settings_dict["weapon_scan"]
     elif data == "toggle_drug_scan":
         settings_dict["drug_scan"] = not settings_dict["drug_scan"]
+    elif data == "toggle_sticker_scan":
+        settings_dict["sticker_scan"] = not settings_dict["sticker_scan"]
     elif data == "toggle_text_scan":
         settings_dict["text_scan"] = not settings_dict["text_scan"]
     elif data == "toggle_media_scan":
@@ -949,6 +954,57 @@ async def scan_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             pass
 
 
+async def scan_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Scan stickers for NSFW content using NudeClassifier"""
+    msg = update.effective_message
+    if not msg or not msg.sticker:
+        return
+    
+    chat_id = msg.chat.id
+    settings_dict = get_chat_settings(chat_id)
+    
+    # Check if sticker scanning is enabled
+    if not settings_dict.get("sticker_scan", False):
+        return
+    
+    try:
+        sticker = msg.sticker
+        file = await context.bot.get_file(sticker.file_id)
+        
+        # Download to temporary file
+        with tempfile.NamedTemporaryFile(suffix=".webp", delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            await file.download_to_drive(custom_path=tmp_path)
+            
+            # Scan sticker using NudeClassifier
+            from nudenet import NudeClassifier
+            classifier = NudeClassifier()
+            result = classifier.classify(tmp_path)
+            
+            # Get unsafe score
+            unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+            
+            # If unsafe score > 0.7, delete and warn
+            if unsafe_score > 0.7:
+                try:
+                    await msg.delete()
+                except Exception:
+                    pass
+                await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - NSFW sticker detected! (score: {unsafe_score:.2f})", 10)
+                return
+                
+        finally:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+                
+    except Exception as e:
+        print(f"Error scanning sticker: {e}")
+
+
 if __name__ == "__main__":
     # Load environment variables from .env file
     load_env_from_file()
@@ -973,7 +1029,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_member))
     app.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, handle_voice_invite))
     app.add_handler(MessageHandler(filters.PHOTO, scan_photo))
-    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL & ~filters.PHOTO, handle_any_message))
+    app.add_handler(MessageHandler(filters.Sticker.ALL, scan_sticker))  # Sticker NSFW scan
+    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL & ~filters.PHOTO & ~filters.Sticker.ALL, handle_any_message))
     
     # Add logging handlers (run after main handlers)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members_log))
