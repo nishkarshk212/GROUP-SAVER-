@@ -14,7 +14,11 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
-from nudenet import NudeDetector, NudeClassifier
+from nudenet import NudeDetector
+try:
+    from nudenet import NudeClassifier
+except ImportError:
+    NudeClassifier = None
 import torch
 from PIL import Image
 
@@ -1175,20 +1179,33 @@ async def scan_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                         detection_method = f"Animated frame analysis ({len(frames)} frames)"
                     else:
                         # Static sticker - use classifier
+                        if NudeClassifier:
+                            classifier = NudeClassifier()
+                            result = classifier.classify(tmp_path)
+                            unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+                            max_score = unsafe_score
+                            nsfw_detected = unsafe_score > 0.7
+                            detection_method = "Static classifier"
+                        else:
+                            # Fallback to detector
+                            frames = extract_gif_frames(tmp_path, sample_rate=1)
+                            is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                            nsfw_detected = is_nsfw
+                            detection_method = "Static detector (no classifier)"
+                except Exception:
+                    # Fallback to detector
+                    if NudeClassifier:
                         classifier = NudeClassifier()
                         result = classifier.classify(tmp_path)
                         unsafe_score = list(result.values())[0].get("unsafe", 0.0)
                         max_score = unsafe_score
                         nsfw_detected = unsafe_score > 0.7
-                        detection_method = "Static classifier"
-                except Exception:
-                    # Fallback to classifier
-                    classifier = NudeClassifier()
-                    result = classifier.classify(tmp_path)
-                    unsafe_score = list(result.values())[0].get("unsafe", 0.0)
-                    max_score = unsafe_score
-                    nsfw_detected = unsafe_score > 0.7
-                    detection_method = "Static classifier (fallback)"
+                        detection_method = "Static classifier (fallback)"
+                    else:
+                        frames = extract_gif_frames(tmp_path, sample_rate=1)
+                        is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                        nsfw_detected = is_nsfw
+                        detection_method = "Static detector (fallback)"
             
             # Handle video stickers (WebM)
             elif file_ext == ".webm" and OPENCV_AVAILABLE:
@@ -1201,12 +1218,19 @@ async def scan_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             
             # Default: static classifier
             else:
-                classifier = NudeClassifier()
-                result = classifier.classify(tmp_path)
-                unsafe_score = list(result.values())[0].get("unsafe", 0.0)
-                max_score = unsafe_score
-                nsfw_detected = unsafe_score > 0.7
-                detection_method = "Static classifier"
+                if NudeClassifier:
+                    classifier = NudeClassifier()
+                    result = classifier.classify(tmp_path)
+                    unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+                    max_score = unsafe_score
+                    nsfw_detected = unsafe_score > 0.7
+                    detection_method = "Static classifier"
+                else:
+                    # Fallback to detector
+                    frames = extract_gif_frames(tmp_path, sample_rate=1)
+                    is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                    nsfw_detected = is_nsfw
+                    detection_method = "Static detector (fallback)"
             
             # If NSFW detected, delete and warn
             if nsfw_detected:
