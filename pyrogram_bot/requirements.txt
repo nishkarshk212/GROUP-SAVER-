@@ -1,0 +1,30 @@
+# Redis and RQ for task queue
+redis
+rq
+
+# Telegram Bot Framework
+pyrogram
+tgcrypto
+
+# NSFW Detection
+nudenet
+Pillow
+
+# Video/Image Processing
+opencv-python
+lottie
+
+# Deep Learning
+torch
+torchvision
+transformers==4.37.2
+
+# Face Analysis (optional - for age/gender detection)
+deepface
+
+# Image Hashing (for known CSAM detection)
+imagehash
+
+# Profanity Filter
+better-profanity
+detoxify
