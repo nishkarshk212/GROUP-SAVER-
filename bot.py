@@ -4,7 +4,7 @@ import asyncio
 import tempfile
 import unicodedata
 from datetime import datetime
-from typing import Dict, Set
+from typing import Dict, Set, List
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,9 +14,24 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
-from nudenet import NudeDetector
+from nudenet import NudeDetector, NudeClassifier
 import torch
 from PIL import Image
+
+# Try to import lottie for TGS support
+try:
+    from lottie.importers.tgs import import_tgs
+    from lottie.exporters.gif import export_gif
+    LOTTIE_AVAILABLE = True
+except ImportError:
+    LOTTIE_AVAILABLE = False
+
+# Try to import OpenCV for video processing
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
 
 # Try to load YOLOv5 for weapon/drug detection
 try:
@@ -954,8 +969,147 @@ async def scan_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             pass
 
 
+def extract_gif_frames(gif_path: str, output_dir: str = None, sample_rate: int = 4) -> List[str]:
+    """
+    Extract frames from animated GIF/WebP.
+    Args:
+        gif_path: Path to GIF/WebP file
+        output_dir: Directory to save frames (default: temp dir)
+        sample_rate: Extract every Nth frame (default: every 4th frame)
+    Returns:
+        List of paths to extracted frame files
+    """
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp()
+    
+    frames = []
+    try:
+        img = Image.open(gif_path)
+        frame_count = 0
+        
+        for i in range(img.n_frames):
+            img.seek(i)
+            # Sample every Nth frame to reduce processing
+            if i % sample_rate == 0:
+                frame_path = os.path.join(output_dir, f"frame_{i}.png")
+                img.save(frame_path, "PNG")
+                frames.append(frame_path)
+                frame_count += 1
+        
+        print(f"Extracted {frame_count} frames from animated sticker")
+    except Exception as e:
+        print(f"Error extracting GIF frames: {e}")
+    
+    return frames
+
+
+def convert_tgs_to_gif(tgs_path: str, gif_path: str) -> bool:
+    """
+    Convert Telegram TGS animated sticker to GIF.
+    Args:
+        tgs_path: Path to .tgs file
+        gif_path: Output path for .gif file
+    Returns:
+        True if successful, False otherwise
+    """
+    if not LOTTIE_AVAILABLE:
+        print("Lottie library not available")
+        return False
+    
+    try:
+        animation = import_tgs(tgs_path)
+        export_gif(animation, gif_path)
+        print(f"Converted TGS to GIF: {gif_path}")
+        return True
+    except Exception as e:
+        print(f"Error converting TGS to GIF: {e}")
+        return False
+
+
+def extract_video_frames(video_path: str, output_dir: str = None, sample_rate: int = 30) -> List[str]:
+    """
+    Extract frames from video file using OpenCV.
+    Args:
+        video_path: Path to video file
+        output_dir: Directory to save frames (default: temp dir)
+        sample_rate: Extract one frame every N seconds (default: every 30 frames ~ 1 sec)
+    Returns:
+        List of paths to extracted frame files
+    """
+    if not OPENCV_AVAILABLE:
+        print("OpenCV not available")
+        return []
+    
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp()
+    
+    frames = []
+    try:
+        cap = cv2.VideoCapture(video_path)
+        count = 0
+        frame_count = 0
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Sample every Nth frame
+            if count % sample_rate == 0:
+                frame_path = os.path.join(output_dir, f"video_frame_{count}.jpg")
+                cv2.imwrite(frame_path, frame)
+                frames.append(frame_path)
+                frame_count += 1
+            
+            count += 1
+        
+        cap.release()
+        print(f"Extracted {frame_count} frames from video")
+    except Exception as e:
+        print(f"Error extracting video frames: {e}")
+    
+    return frames
+
+
+def scan_frames_for_nsfw(frames: List[str], threshold: float = 0.7) -> tuple:
+    """
+    Scan multiple frames for NSFW content.
+    Args:
+        frames: List of image paths to scan
+        threshold: NSFW confidence threshold
+    Returns:
+        Tuple of (is_nsfw: bool, max_score: float, nsfw_frame: str or None)
+    """
+    if not frames:
+        return False, 0.0, None
+    
+    detector = NudeDetector()
+    max_score = 0.0
+    nsfw_frame = None
+    
+    for frame_path in frames:
+        try:
+            result = detector.detect(frame_path)
+            
+            # Check if any detection exceeds threshold
+            for detection in result:
+                score = detection.get("score", 0.0)
+                if score > max_score:
+                    max_score = score
+                    nsfw_frame = frame_path
+                
+                if score >= threshold:
+                    print(f"NSFW detected in {frame_path} with score {score:.2f}")
+                    return True, score, frame_path
+        except Exception as e:
+            print(f"Error scanning frame {frame_path}: {e}")
+            continue
+    
+    return max_score >= threshold, max_score, nsfw_frame
+
+
 async def scan_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Scan stickers for NSFW content using NudeClassifier"""
+    """Scan stickers for NSFW content (static & animated) using NudeClassifier and NudeDetector"""
     msg = update.effective_message
     if not msg or not msg.sticker:
         return
@@ -971,28 +1125,98 @@ async def scan_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         sticker = msg.sticker
         file = await context.bot.get_file(sticker.file_id)
         
+        # Determine file extension based on sticker format
+        file_ext = ".webp"
+        if sticker.format == 1:  # Animated WebP
+            file_ext = ".webp"
+        elif sticker.format == 2:  # TGS (Lottie)
+            file_ext = ".tgs"
+        elif sticker.format == 3:  # Video sticker (WebM)
+            file_ext = ".webm"
+        
         # Download to temporary file
-        with tempfile.NamedTemporaryFile(suffix=".webp", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
             tmp_path = tmp.name
         
         try:
             await file.download_to_drive(custom_path=tmp_path)
             
-            # Scan sticker using NudeClassifier
-            from nudenet import NudeClassifier
-            classifier = NudeClassifier()
-            result = classifier.classify(tmp_path)
+            nsfw_detected = False
+            max_score = 0.0
+            detection_method = ""
             
-            # Get unsafe score
-            unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+            # Handle TGS (Lottie) animated stickers
+            if file_ext == ".tgs" and LOTTIE_AVAILABLE:
+                print("Processing TGS animated sticker...")
+                gif_path = tmp_path.replace(".tgs", ".gif")
+                
+                if convert_tgs_to_gif(tmp_path, gif_path):
+                    frames = extract_gif_frames(gif_path, sample_rate=4)
+                    is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                    nsfw_detected = is_nsfw
+                    detection_method = "TGS frame analysis"
+                    
+                    # Cleanup GIF
+                    try:
+                        os.remove(gif_path)
+                    except:
+                        pass
             
-            # If unsafe score > 0.7, delete and warn
-            if unsafe_score > 0.7:
+            # Handle animated WebP/GIF
+            elif file_ext in [".webp", ".gif"]:
+                try:
+                    img = Image.open(tmp_path)
+                    if hasattr(img, 'n_frames') and img.n_frames > 1:
+                        # Animated - extract and scan frames
+                        print(f"Processing animated sticker ({img.n_frames} frames)...")
+                        frames = extract_gif_frames(tmp_path, sample_rate=4)
+                        is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                        nsfw_detected = is_nsfw
+                        detection_method = f"Animated frame analysis ({len(frames)} frames)"
+                    else:
+                        # Static sticker - use classifier
+                        classifier = NudeClassifier()
+                        result = classifier.classify(tmp_path)
+                        unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+                        max_score = unsafe_score
+                        nsfw_detected = unsafe_score > 0.7
+                        detection_method = "Static classifier"
+                except Exception:
+                    # Fallback to classifier
+                    classifier = NudeClassifier()
+                    result = classifier.classify(tmp_path)
+                    unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+                    max_score = unsafe_score
+                    nsfw_detected = unsafe_score > 0.7
+                    detection_method = "Static classifier (fallback)"
+            
+            # Handle video stickers (WebM)
+            elif file_ext == ".webm" and OPENCV_AVAILABLE:
+                print("Processing video sticker...")
+                frames = extract_video_frames(tmp_path, sample_rate=30)
+                if frames:
+                    is_nsfw, max_score, _ = scan_frames_for_nsfw(frames)
+                    nsfw_detected = is_nsfw
+                    detection_method = f"Video frame analysis ({len(frames)} frames)"
+            
+            # Default: static classifier
+            else:
+                classifier = NudeClassifier()
+                result = classifier.classify(tmp_path)
+                unsafe_score = list(result.values())[0].get("unsafe", 0.0)
+                max_score = unsafe_score
+                nsfw_detected = unsafe_score > 0.7
+                detection_method = "Static classifier"
+            
+            # If NSFW detected, delete and warn
+            if nsfw_detected:
                 try:
                     await msg.delete()
                 except Exception:
                     pass
-                await send_temp(context, chat_id, f"⚠️ Moderation: User ID `{msg.from_user.id}` - NSFW sticker detected! (score: {unsafe_score:.2f})", 10)
+                await send_temp(context, chat_id, 
+                    f"⚠️ Moderation: User ID `{msg.from_user.id}` - NSFW {detection_method} (score: {max_score:.2f})", 
+                    10)
                 return
                 
         finally:
