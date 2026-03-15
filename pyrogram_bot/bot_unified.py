@@ -392,7 +392,7 @@ async def handle_nsfw_detection(message: Message, result: dict):
 
 @app.on_message(filters.command("start"))
 async def start_command(client: Client, message: Message):
-    """Handle /start command"""
+    """Handle /start command with bot's profile picture"""
     welcome_text = """🤖 **NSFW Moderation Bot** (Optimized)
 
 I can detect and moderate NSFW content including:
@@ -409,7 +409,26 @@ I can detect and moderate NSFW content including:
 
 Use /settings to configure ALL options in one place!"""
     
-    await message.reply(welcome_text)
+    try:
+        # Get bot's profile photo
+        bot_profile = await client.get_chat("me")
+        photo_id = bot_profile.photo.big_file_id if bot_profile.photo else None
+        
+        if photo_id:
+            # Send photo with caption
+            await client.send_photo(
+                chat_id=message.chat.id,
+                photo=photo_id,
+                caption=welcome_text,
+                parse_mode="markdown"
+            )
+        else:
+            # No profile photo, send text only
+            await message.reply(welcome_text)
+    except Exception as e:
+        print(f"Error sending profile photo: {e}")
+        # Fallback to text message
+        await message.reply(welcome_text)
 
 
 @app.on_message(filters.photo)
