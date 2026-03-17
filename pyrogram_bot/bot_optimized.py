@@ -226,11 +226,12 @@ async def sticker_handler(client: Client, message: Message):
     sticker = message.sticker
     file_ext = ".webp"
     
-    # Detect sticker format
-    if sticker.format and sticker.format.value == 2:  # TGS (Lottie)
-        file_ext = ".tgs"
-    elif sticker.format and sticker.format.value == 3:  # Video sticker
-        file_ext = ".webm"
+    # Detect sticker type (Pyrogram 2.0+ uses 'type' instead of 'format')
+    if hasattr(sticker, 'type'):
+        if sticker.type == "animated":  # TGS (Lottie)
+            file_ext = ".tgs"
+        elif sticker.type == "video":  # Video sticker
+            file_ext = ".webm"
     
     with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
         tmp_path = tmp.name
