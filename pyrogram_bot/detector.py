@@ -3,16 +3,26 @@ NSFW Detector Module
 Uses NudeNet for image classification and detection
 """
 
-from nudenet import NudeDetector, NudeClassifier
+from nudenet import NudeDetector
+try:
+    from nudenet import NudeClassifier
+    CLASSIFIER_AVAILABLE = True
+except (ImportError, AttributeError):
+    NudeClassifier = None
+    CLASSIFIER_AVAILABLE = False
+    
 from config import NSFW_THRESHOLD
 
 
 class NSFWDetector:
     def __init__(self):
         self.detector = NudeDetector()
-        try:
-            self.classifier = NudeClassifier()
-        except ImportError:
+        if CLASSIFIER_AVAILABLE:
+            try:
+                self.classifier = NudeClassifier()
+            except Exception:
+                self.classifier = None
+        else:
             self.classifier = None
     
     def is_nsfw(self, image_path: str) -> tuple:
